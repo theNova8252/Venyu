@@ -16,18 +16,19 @@
     <section class="hero-section" ref="heroSection">
       <div class="container">
         <div class="text-center q-pt-xl q-pb-xl fade-in-up" :class="{ 'visible': visibleSections.has('hero') }">
+          <img src="../assets/venyuUpscaled.png" alt="" class="hero-logo fade-in-up"
+            :class="{ visible: visibleSections.has('hero') }">
           <h1 class="hero-title">
             Connect Through Music
           </h1>
           <p class="hero-subtitle q-mb-xl">
-            Discover events, meet people, and build your tribe through shared Spotify tastes.
+            Find your rhythm with Venyu – the ultimate app to discover music events and connect with like-minded fans
           </p>
           <div class="cta-buttons">
-            <q-btn unelevated size="lg" class="cta-primary magnetic-btn" label="Join Venyu" @click="onJoinClick"
-              @mouseenter="onMagneticEnter" @mousemove="onMagneticMove" @mouseleave="onMagneticLeave" />
-            <q-btn outline size="lg" class="cta-secondary glass-btn" label="Connect with Spotify"
+            <q-btn outline size="lg" class="cta-secondary glass-btn flex items-center justify-center gap-3"
               @click="onSpotifyConnect">
               <template v-slot:default>
+                <img src="/src/assets/spotify-logo.png" alt="Spotify Logo" class="spotify-icon" />
                 <span class="button-text">Connect with Spotify</span>
                 <div class="button-glow"></div>
               </template>
@@ -196,9 +197,12 @@
           <p class="cta-subtitle q-mb-xl">
             Join thousands of music lovers discovering events and making real connections
           </p>
-          <q-btn unelevated size="xl" class="cta-primary-large glow-btn" label="Get Started Now" @click="onJoinClick">
-            <div class="button-shine"></div>
-          </q-btn>
+          <div class="cta-actions">
+            <q-btn unelevated size="xl" class="cta-primary-large glow-btn" label="Get Started Now" @click="scrollToTop">
+              <div class="button-shine"></div>
+            </q-btn>
+          </div>
+
         </div>
 
         <!-- Stats Counter -->
@@ -261,284 +265,275 @@
   </q-page>
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { scroll } from 'quasar'
 
-export default {
-  name: 'VenyuLanding',
+/* ---------- Refs used in template ---------- */
+const particlesCanvas = ref(null)
+const heroSection = ref(null)
+const featuresSection = ref(null)
+const previewSection = ref(null)
+const testimonialsSection = ref(null)
+const ctaSection = ref(null)
+const featureCards = ref([])
+const visibleSections = ref(new Set())
 
-  setup() {
-    const particlesCanvas = ref(null)
-    const heroSection = ref(null)
-    const featuresSection = ref(null)
-    const previewSection = ref(null)
-    const testimonialsSection = ref(null)
-    const ctaSection = ref(null)
-    const featureCards = ref([])
-    const visibleSections = ref(new Set())
+/* ---------- Static data ---------- */
+const features = ref([
+  {
+    icon: 'headphones',
+    title: 'Spotify Integration',
+    description:
+      'Connect your Spotify account and let us analyze your top artists, genres, and listening patterns to find your perfect musical matches.',
+  },
+  {
+    icon: 'favorite',
+    title: 'Music-Based Matching',
+    description:
+      'Discover people who share your sound. Our algorithm matches you with others based on musical compatibility and shared tastes.',
+  },
+  {
+    icon: 'map',
+    title: 'Event Discovery',
+    description:
+      'See concerts, festivals, and music events near you. Find out who else is going and connect before the show even starts.',
+  },
+  {
+    icon: 'chat',
+    title: 'Real-Time Chat',
+    description:
+      'Match with someone? Start chatting instantly. Plan meetups at events, share playlists, and build your music community.',
+  },
+])
 
-    const features = ref([
-      {
-        icon: 'headphones',
-        title: 'Spotify Integration',
-        description: 'Connect your Spotify account and let us analyze your top artists, genres, and listening patterns to find your perfect musical matches.'
-      },
-      {
-        icon: 'favorite',
-        title: 'Music-Based Matching',
-        description: 'Discover people who share your sound. Our algorithm matches you with others based on musical compatibility and shared tastes.'
-      },
-      {
-        icon: 'map',
-        title: 'Event Discovery',
-        description: 'See concerts, festivals, and music events near you. Find out who else is going and connect before the show even starts.'
-      },
-      {
-        icon: 'chat',
-        title: 'Real-Time Chat',
-        description: 'Match with someone? Start chatting instantly. Plan meetups at events, share playlists, and build your music community.'
-      }
-    ])
+const testimonials = ref([
+  {
+    name: 'Alex Rivera',
+    genre: 'Indie Rock Enthusiast',
+    avatar: 'https://i.pravatar.cc/150?img=33',
+    text:
+      'Found my concert crew through Venyu. We have gone to 12 shows together in the past 6 months. This app changed how I experience live music.',
+  },
+  {
+    name: 'Maya Chen',
+    genre: 'Electronic Music Lover',
+    avatar: 'https://i.pravatar.cc/150?img=45',
+    text:
+      'The matching algorithm is incredible. Every person I have met through Venyu has introduced me to amazing new artists. My Spotify has never been better.',
+  },
+  {
+    name: 'Jordan Blake',
+    genre: 'Hip-Hop Head',
+    avatar: 'https://i.pravatar.cc/150?img=68',
+    text:
+      'As someone who moved to a new city, Venyu helped me find my people. Now I have a whole friend group that gets my music taste. Game changer.',
+  },
+])
 
-    const testimonials = ref([
-      {
-        name: 'Alex Rivera',
-        genre: 'Indie Rock Enthusiast',
-        avatar: 'https://i.pravatar.cc/150?img=33',
-        text: 'Found my concert crew through Venyu. We have gone to 12 shows together in the past 6 months. This app changed how I experience live music.'
-      },
-      {
-        name: 'Maya Chen',
-        genre: 'Electronic Music Lover',
-        avatar: 'https://i.pravatar.cc/150?img=45',
-        text: 'The matching algorithm is incredible. Every person I have met through Venyu has introduced me to amazing new artists. My Spotify has never been better.'
-      },
-      {
-        name: 'Jordan Blake',
-        genre: 'Hip-Hop Head',
-        avatar: 'https://i.pravatar.cc/150?img=68',
-        text: 'As someone who moved to a new city, Venyu helped me find my people. Now I have a whole friend group that gets my music taste. Game changer.'
-      }
-    ])
+const stats = ref([
+  { label: 'Active Users', value: 50000 },
+  { label: 'Matches Made', value: 250000 },
+  { label: 'Events Discovered', value: 10000 },
+])
 
-    const stats = ref([
-      { label: 'Active Users', value: 50000 },
-      { label: 'Matches Made', value: 250000 },
-      { label: 'Events Discovered', value: 10000 }
-    ])
+const animatedStats = ref({
+  'Active Users': '0',
+  'Matches Made': '0',
+  'Events Discovered': '0',
+})
 
-    const animatedStats = ref({
-      'Active Users': '0',
-      'Matches Made': '0',
-      'Events Discovered': '0'
-    })
+let particles = []
+let animationFrame = null
+let observer = null
 
-    let particles = []
-    let animationFrame = null
-    let observer = null
-
-    // Intersection Observer for scroll animations
-    const setupIntersectionObserver = () => {
-      observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              const sectionId = entry.target.getAttribute('data-section')
-              if (sectionId) {
-                visibleSections.value.add(sectionId)
-                if (sectionId === 'cta') animateStats()
-              }
-            }
-          })
-        },
-        { threshold: 0.15 }
-      )
-
-      const sections = [
-        { ref: heroSection, id: 'hero' },
-        { ref: featuresSection, id: 'features' },
-        { ref: previewSection, id: 'preview' },
-        { ref: testimonialsSection, id: 'testimonials' },
-        { ref: ctaSection, id: 'cta' }
-      ]
-
-      sections.forEach(({ ref, id }) => {
-        if (ref.value) {
-          ref.value.setAttribute('data-section', id)
-          observer.observe(ref.value)
-        }
+const setupIntersectionObserver = () => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return
+        const sectionId = entry.target.getAttribute('data-section')
+        if (!sectionId) return
+        visibleSections.value.add(sectionId)
+        if (sectionId === 'cta') animateStats()
       })
-    }
+    },
+    { threshold: 0.15 },
+  )
 
-    // Particles animation
-    const initParticles = () => {
-      const canvas = particlesCanvas.value
-      if (!canvas) return
-
-      canvas.width = window.innerWidth
-      canvas.height = window.innerHeight
-      const ctx = canvas.getContext('2d')
-
-      class Particle {
-        constructor() {
-          this.x = Math.random() * canvas.width
-          this.y = Math.random() * canvas.height
-          this.size = Math.random() * 2 + 1
-          this.speedX = Math.random() * 0.5 - 0.25
-          this.speedY = Math.random() * 0.5 - 0.25
-          this.color = `hsla(${Math.random() * 60 + 260}, 70%, 60%, ${Math.random() * 0.5 + 0.2})`
-        }
-
-        update() {
-          this.x += this.speedX
-          this.y += this.speedY
-          if (this.x > canvas.width) this.x = 0
-          if (this.x < 0) this.x = canvas.width
-          if (this.y > canvas.height) this.y = 0
-          if (this.y < 0) this.y = canvas.height
-        }
-
-        draw() {
-          ctx.fillStyle = this.color
-          ctx.beginPath()
-          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
-          ctx.fill()
-        }
-      }
-
-      particles = []
-      for (let i = 0; i < 100; i++) particles.push(new Particle())
-
-      const animate = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-        particles.forEach(p => { p.update(); p.draw() })
-
-        // Connect particles
-        particles.forEach((a, i) => {
-          particles.slice(i + 1).forEach(b => {
-            const dx = a.x - b.x
-            const dy = a.y - b.y
-            const distance = Math.sqrt(dx * dx + dy * dy)
-            if (distance < 100) {
-              ctx.strokeStyle = `hsla(280, 70%, 60%, ${0.2 * (1 - distance / 100)})`
-              ctx.lineWidth = 0.5
-              ctx.beginPath()
-              ctx.moveTo(a.x, a.y)
-              ctx.lineTo(b.x, b.y)
-              ctx.stroke()
-            }
-          })
-        })
-
-        animationFrame = requestAnimationFrame(animate)
-      }
-
-      animate()
-    }
-
-    // Stats counter animation
-    const animateStats = () => {
-      stats.value.forEach(stat => {
-        let current = 0
-        const increment = stat.value / 100
-        const timer = setInterval(() => {
-          current += increment
-          if (current >= stat.value) {
-            current = stat.value
-            clearInterval(timer)
-          }
-          animatedStats.value[stat.label] = Math.floor(current).toLocaleString() + '+'
-        }, 20)
-      })
-    }
-
-    // Magnetic button effect
-    const onMagneticEnter = (e) => {
-      e.target.style.transition = 'transform 0.3s ease'
-    }
-    const onMagneticMove = (e) => {
-      const btn = e.target
-      const rect = btn.getBoundingClientRect()
-      const x = e.clientX - rect.left - rect.width / 2
-      const y = e.clientY - rect.top - rect.height / 2
-      btn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`
-    }
-    const onMagneticLeave = (e) => {
-      e.target.style.transform = 'translate(0, 0)'
-    }
-
-    // Card tilt effect
-    const onCardEnter = (index) => {
-      const card = featureCards.value[index]
-      if (card) card.$el.style.transition = 'transform 0.1s ease'
-    }
-    const onCardMove = (e, index) => {
-      const card = featureCards.value[index]
-      if (!card) return
-      const rect = card.$el.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const centerX = rect.width / 2
-      const centerY = rect.height / 2
-      const rotateX = (y - centerY) / 10
-      const rotateY = (centerX - x) / 10
-      card.$el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`
-    }
-    const onCardLeave = (index) => {
-      const card = featureCards.value[index]
-      if (card) card.$el.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)'
-    }
-
-    const onJoinClick = () => { console.log('Join Venyu clicked') }
-    const onSpotifyConnect = () => { console.log('Spotify connect clicked') }
-
-    onMounted(() => {
-      initParticles()
-      setupIntersectionObserver()
-
-      const handleResize = () => {
-        if (particlesCanvas.value) {
-          particlesCanvas.value.width = window.innerWidth
-          particlesCanvas.value.height = window.innerHeight
-        }
-      }
-      window.addEventListener('resize', handleResize)
-      return () => window.removeEventListener('resize', handleResize)
+    ;[
+      { ref: heroSection, id: 'hero' },
+      { ref: featuresSection, id: 'features' },
+      { ref: previewSection, id: 'preview' },
+      { ref: testimonialsSection, id: 'testimonials' },
+      { ref: ctaSection, id: 'cta' },
+    ].forEach(({ ref: r, id }) => {
+      if (!r.value) return
+      r.value.setAttribute('data-section', id)
+      observer.observe(r.value)
     })
+}
 
-    onUnmounted(() => {
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-      if (observer) observer.disconnect()
-    })
+const initParticles = () => {
+  const canvas = particlesCanvas.value
+  if (!canvas) return
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+  const ctx = canvas.getContext('2d')
 
-    return {
-      particlesCanvas,
-      heroSection,
-      featuresSection,
-      previewSection,
-      testimonialsSection,
-      ctaSection,
-      featureCards,
-      features,
-      testimonials,
-      stats,
-      animatedStats,
-      visibleSections,
-      onMagneticEnter,
-      onMagneticMove,
-      onMagneticLeave,
-      onCardEnter,
-      onCardMove,
-      onCardLeave,
-      onJoinClick,
-      onSpotifyConnect
+  class Particle {
+    constructor() {
+      this.x = Math.random() * canvas.width
+      this.y = Math.random() * canvas.height
+      this.size = Math.random() * 2 + 1
+      this.speedX = Math.random() * 0.5 - 0.25
+      this.speedY = Math.random() * 0.5 - 0.25
+      this.color = `hsla(${Math.random() * 60 + 260}, 70%, 60%, ${Math.random() * 0.5 + 0.2})`
+    }
+    update() {
+      this.x += this.speedX
+      this.y += this.speedY
+      if (this.x > canvas.width) this.x = 0
+      if (this.x < 0) this.x = canvas.width
+      if (this.y > canvas.height) this.y = 0
+      if (this.y < 0) this.y = canvas.height
+    }
+    draw() {
+      ctx.fillStyle = this.color
+      ctx.beginPath()
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2)
+      ctx.fill()
     }
   }
+
+  particles = Array.from({ length: 100 }, () => new Particle())
+
+  const animate = () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    particles.forEach((p) => {
+      p.update()
+      p.draw()
+    })
+
+    // connect particles
+    particles.forEach((a, i) => {
+      particles.slice(i + 1).forEach((b) => {
+        const dx = a.x - b.x
+        const dy = a.y - b.y
+        const distance = Math.hypot(dx, dy)
+        if (distance < 100) {
+          ctx.strokeStyle = `hsla(280, 70%, 60%, ${0.2 * (1 - distance / 100)})`
+          ctx.lineWidth = 0.5
+          ctx.beginPath()
+          ctx.moveTo(a.x, a.y)
+          ctx.lineTo(b.x, b.y)
+          ctx.stroke()
+        }
+      })
+    })
+
+    animationFrame = requestAnimationFrame(animate)
+  }
+
+  animate()
 }
+
+/* ---------- Animations & effects used in template ---------- */
+const animateStats = () => {
+  stats.value.forEach((stat) => {
+    let current = 0
+    const increment = stat.value / 100
+    const timer = setInterval(() => {
+      current += increment
+      if (current >= stat.value) {
+        current = stat.value
+        clearInterval(timer)
+      }
+      animatedStats.value[stat.label] = Math.floor(current).toLocaleString() + '+'
+    }, 20)
+  })
+}
+
+const onMagneticEnter = (e) => {
+  e.target.style.transition = 'transform 0.3s ease'
+}
+const onMagneticMove = (e) => {
+  const btn = e.target
+  const rect = btn.getBoundingClientRect()
+  const x = e.clientX - rect.left - rect.width / 2
+  const y = e.clientY - rect.top - rect.height / 2
+  btn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`
+}
+const onMagneticLeave = (e) => {
+  e.target.style.transform = 'translate(0, 0)'
+}
+
+const onCardEnter = (index) => {
+  const card = featureCards.value[index]
+  if (card) card.$el.style.transition = 'transform 0.1s ease'
+}
+const onCardMove = (e, index) => {
+  const card = featureCards.value[index]
+  if (!card) return
+  const rect = card.$el.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  const centerX = rect.width / 2
+  const centerY = rect.height / 2
+  const rotateX = (y - centerY) / 10
+  const rotateY = (centerX - x) / 10
+  card.$el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale(1.05)`
+}
+const onCardLeave = (index) => {
+  const card = featureCards.value[index]
+  if (card) card.$el.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale(1)'
+}
+
+/* ---------- CTA handlers ---------- */
+const onJoinClick = () => {
+  console.log('Join Venyu clicked')
+}
+
+const { getScrollTarget, setVerticalScrollPosition } = scroll
+
+function scrollToTop() {
+  const el = document.scrollingElement || document.documentElement // <- element, not window
+  const target = getScrollTarget(el)
+  setVerticalScrollPosition(target, 0, 600) // 600ms smooth scroll
+}
+
+
+
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:8888'
+const onSpotifyConnect = () => {
+  const state = btoa(JSON.stringify({ returnTo: window.location.href }))
+  window.location.href = `${API}/spotify/auth/login?state=${encodeURIComponent(state)}`
+}
+
+/* ---------- Lifecycle ---------- */
+onMounted(() => {
+  initParticles()
+  setupIntersectionObserver()
+
+  const handleResize = () => {
+    if (!particlesCanvas.value) return
+    particlesCanvas.value.width = window.innerWidth
+    particlesCanvas.value.height = window.innerHeight
+  }
+  window.addEventListener('resize', handleResize)
+  // store so we can remove on unmount
+  onUnmounted(() => window.removeEventListener('resize', handleResize))
+})
+
+onUnmounted(() => {
+  if (animationFrame) cancelAnimationFrame(animationFrame)
+  if (observer) observer.disconnect()
+})
 </script>
 
+
 <style scoped lang="scss">
-/* Fade in animations */
+
 .fade-in-up {
   opacity: 0;
   transform: translateY(60px);
@@ -646,6 +641,11 @@ export default {
   }
 }
 
+.spotify-icon {
+  width: 30px;
+  height: 30px;
+  margin-right: 8px;
+}
 .noise-overlay {
   position: absolute;
   top: 0;
@@ -677,6 +677,22 @@ export default {
   z-index: 2;
 }
 
+.hero-logo {
+  display: block;
+  margin: 0 auto 0.2rem;
+  width: clamp(220px, 32vw, 560px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 30px rgba(0, 0, 0, .35));
+  z-index: 2;
+}
+
+
+@media (max-width: 480px) {
+  .hero-logo {
+    height: clamp(48px, 12vw, 100px);
+  }
+}
 .container {
   max-width: 1200px;
   margin: 0 auto;

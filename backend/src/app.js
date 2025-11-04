@@ -5,7 +5,7 @@ import path from 'path';
 import cors from 'cors';
 import debug from 'debug';
 
-import testRoute from './api/routes/testRoutes.js';
+import spotifyRoute from './api/routes/spotifyRoutes.js';
 
 dotenv.config();
 debug.enable(process.env.DEBUG); // enable DEBUG from .env
@@ -21,7 +21,7 @@ app.use(cors());
 app.use(express.static(path.join(dirname, '/public')));
 app.use(express.json());
 
-app.use('/test', testRoute);
+app.use('/spotify', spotifyRoute);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => startup(`Server is running on port ${PORT}`));
