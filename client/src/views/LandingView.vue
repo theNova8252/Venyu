@@ -25,6 +25,8 @@
             Find your rhythm with Venyu – the ultimate app to discover music events and connect with like-minded fans
           </p>
           <div class="cta-buttons">
+            <q-btn unelevated size="lg" class="cta-primary flex items-center justify-center gap-3" label="Start Demo"
+              @click="startDemo" />
             <q-btn outline size="lg" class="cta-secondary glass-btn flex items-center justify-center gap-3"
               @click="onSpotifyConnect">
               <template v-slot:default>
@@ -268,6 +270,18 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { scroll } from 'quasar'
+import { useQuasar } from 'quasar'            // ← ADD
+import { useRouter } from 'vue-router'                 // ← ADD
+import { IS_DEMO } from '@/config/mode'                // ← ADD
+import { useUserStore } from '@/stores/user'           // ← ADD
+import { useMatchesStore } from '@/stores/matches'     // ← ADD
+import { useEventsStore } from '@/stores/events'       // ← ADD
+
+const $q = useQuasar()                                 // ← ADD
+const router = useRouter()                             // ← ADD
+const user = useUserStore()                            // ← ADD
+const matches = useMatchesStore()                      // ← ADD
+const events = useEventsStore()
 
 /* ---------- Refs used in template ---------- */
 const particlesCanvas = ref(null)
@@ -330,7 +344,27 @@ const testimonials = ref([
       'As someone who moved to a new city, Venyu helped me find my people. Now I have a whole friend group that gets my music taste. Game changer.',
   },
 ])
-
+async function startDemo() {
+  try {
+    $q.loading?.show()
+    await user.fetchMe()
+    await matches.fetchMatches()
+    await events.fetchNearby()
+    // adjust the route name/path to your dashboard/home route
+    router.push({ name: 'DemoLogin' })
+  } finally {
+    $q.loading?.hide()
+  }
+}
+const API = import.meta.env.VITE_API_BASE || 'http://localhost:8888'
+const onSpotifyConnect = () => {
+  if (IS_DEMO) {
+    $q.notify({ type: 'info', message: 'Demo mode is active — use “Start Demo” to explore without Spotify.' })
+    return
+  }
+  const state = btoa(JSON.stringify({ returnTo: window.location.href }))
+  window.location.href = `${API}/spotify/auth/login?state=${encodeURIComponent(state)}`
+}
 const stats = ref([
   { label: 'Active Users', value: 50000 },
   { label: 'Matches Made', value: 250000 },
@@ -503,12 +537,6 @@ function scrollToTop() {
 }
 
 
-
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:8888'
-const onSpotifyConnect = () => {
-  const state = btoa(JSON.stringify({ returnTo: window.location.href }))
-  window.location.href = `${API}/spotify/auth/login?state=${encodeURIComponent(state)}`
-}
 
 /* ---------- Lifecycle ---------- */
 onMounted(() => {

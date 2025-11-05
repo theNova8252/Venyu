@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { api } from '@/api';
 
 const TOKEN_KEY = 'spotify_tokens';
 const CODE_VERIFIER_KEY = 'spotify_pkce_verifier';

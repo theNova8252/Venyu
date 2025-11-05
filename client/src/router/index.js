@@ -5,6 +5,7 @@ import CallbackView from '@/views/CallbackView.vue';
 import ProtectedView from '@/views/ProtectedView.vue';
 import LandingView from '../views/LandingView.vue';
 import OnboardingPage from '@/views/OnboardingPage.vue';
+import DemoLogin from '../views/DemoLogin.vue';
 import { useAuthStore } from '@/stores/auth.js';
 
 const router = createRouter({
@@ -12,10 +13,16 @@ const router = createRouter({
   routes: [
     { path: '/', component: HomeView },
     { path: '/login', component: LoginView },
+    { path: '/home', name: 'Home', component: HomeView },
     { path: '/callback', component: CallbackView },
     { path: '/protected', component: ProtectedView, meta: { requiresAuth: true } },
     { path: '/landing', component: LandingView },
     { path: '/onboarding', component: OnboardingPage },
+    {
+      path: '/demo-login',
+      component: DemoLogin,
+      name: 'DemoLogin',
+    },
   ],
 });
 
