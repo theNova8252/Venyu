@@ -15,9 +15,6 @@
             <q-icon name="music_note" size="32px" color="purple-5" />
             <h1 class="page-title">Discover</h1>
           </div>
-          <div class="filters-section">
-            <q-btn flat round icon="tune" size="md" color="white" @click="showFilters = !showFilters" />
-          </div>
         </div>
       </div>
 
@@ -41,8 +38,7 @@
           'card-active': index === 0,
           'card-next': index === 1,
           'card-behind': index === 2
-        }" :style="getCardStyle(index)" @mousedown="index === 0 ? startDrag($event) : null"
-          @touchstart="index === 0 ? startDrag($event) : null">
+        }" :style="getCardStyle(index)">
           <!-- Card Content -->
           <div class="card-image-container">
             <img :src="card.avatar" :alt="card.name" class="card-image" />
@@ -53,20 +49,6 @@
               <q-icon name="auto_awesome" size="18px" />
               <span>{{ card.matchScore }}% Match</span>
             </div>
-
-            <!-- Like/Nope Overlays -->
-            <transition name="fade">
-              <div v-if="index === 0 && dragDirection === 'right'" class="swipe-overlay like-overlay">
-                <q-icon name="favorite" size="80px" />
-                <span>LIKE</span>
-              </div>
-            </transition>
-            <transition name="fade">
-              <div v-if="index === 0 && dragDirection === 'left'" class="swipe-overlay nope-overlay">
-                <q-icon name="close" size="80px" />
-                <span>NOPE</span>
-              </div>
-            </transition>
           </div>
 
           <!-- Card Info -->
@@ -116,19 +98,14 @@
 
       <!-- Action Buttons -->
       <div v-if="currentCardIndex < cards.length" class="action-buttons">
-        <q-btn round size="lg" icon="close" color="red-5" class="action-btn nope-btn" @click="swipeLeft"
+        <q-btn round size="xl" icon="close" color="red-5" class="action-btn dislike-btn" @click="swipeLeft"
           :disable="isAnimating">
-          <q-tooltip>Nope</q-tooltip>
+          <q-tooltip>Dislike</q-tooltip>
         </q-btn>
 
         <q-btn round size="xl" icon="favorite" color="green-5" class="action-btn like-btn" @click="swipeRight"
           :disable="isAnimating">
           <q-tooltip>Like</q-tooltip>
-        </q-btn>
-
-        <q-btn round size="lg" icon="star" color="blue-5" class="action-btn super-btn" @click="superLike"
-          :disable="isAnimating">
-          <q-tooltip>Super Like</q-tooltip>
         </q-btn>
       </div>
     </div>
@@ -301,67 +278,7 @@ const visibleCards = computed(() => {
 })
 
 const getCardStyle = (index) => {
-  if (index === 0 && isDragging.value) {
-    const rotation = (dragCurrentX.value - dragStartX.value) / 20
-    return {
-      transform: `translate(${dragCurrentX.value - dragStartX.value}px, ${dragCurrentY.value - dragStartY.value}px) rotate(${rotation}deg)`,
-      transition: 'none'
-    }
-  }
   return {}
-}
-
-const startDrag = (event) => {
-  const touch = event.touches ? event.touches[0] : event
-  dragStartX.value = touch.clientX
-  dragStartY.value = touch.clientY
-  dragCurrentX.value = touch.clientX
-  dragCurrentY.value = touch.clientY
-  isDragging.value = true
-
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', endDrag)
-  document.addEventListener('touchmove', onDrag)
-  document.addEventListener('touchend', endDrag)
-}
-
-const onDrag = (event) => {
-  if (!isDragging.value) return
-
-  const touch = event.touches ? event.touches[0] : event
-  dragCurrentX.value = touch.clientX
-  dragCurrentY.value = touch.clientY
-
-  const deltaX = dragCurrentX.value - dragStartX.value
-
-  if (Math.abs(deltaX) > 50) {
-    dragDirection.value = deltaX > 0 ? 'right' : 'left'
-  } else {
-    dragDirection.value = null
-  }
-}
-
-const endDrag = () => {
-  if (!isDragging.value) return
-
-  const deltaX = dragCurrentX.value - dragStartX.value
-  const threshold = 100
-
-  if (Math.abs(deltaX) > threshold) {
-    if (deltaX > 0) {
-      swipeRight()
-    } else {
-      swipeLeft()
-    }
-  }
-
-  isDragging.value = false
-  dragDirection.value = null
-
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', endDrag)
-  document.removeEventListener('touchmove', onDrag)
-  document.removeEventListener('touchend', endDrag)
 }
 
 const swipeLeft = () => {
@@ -408,29 +325,6 @@ const swipeRight = () => {
     currentCardIndex.value++
     isAnimating.value = false
   }, 300)
-}
-
-const superLike = () => {
-  if (isAnimating.value) return
-  isAnimating.value = true
-
-  const currentCard = cards.value[currentCardIndex.value]
-
-  $q.notify({
-    message: 'Super Liked! ⭐',
-    color: 'blue-5',
-    icon: 'star',
-    position: 'top',
-    timeout: 1500
-  })
-
-  // High chance of match with super like
-  setTimeout(() => {
-    lastMatchedUser.value = currentCard
-    showMatchModal.value = true
-    currentCardIndex.value++
-    isAnimating.value = false
-  }, 500)
 }
 
 const closeMatchModal = () => {
@@ -522,17 +416,18 @@ onMounted(() => {
 .swipe-container {
   position: relative;
   z-index: 1;
-  max-width: 500px;
+  max-width: 420px;
   margin: 0 auto;
   padding: 1rem;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  gap: 1.5rem;
 }
 
 .swipe-header {
-  padding: 1rem 0;
-  margin-bottom: 2rem;
+  padding: 0.5rem 0;
+  flex-shrink: 0;
 }
 
 .header-content {
@@ -555,51 +450,51 @@ onMounted(() => {
 }
 
 .cards-stack {
-  flex: 1;
+  flex: 0 0 auto;
   position: relative;
-  margin-bottom: 2rem;
-  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 560px;
 }
 
 .profile-card {
   position: absolute;
   width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
+  max-width: 380px;
+  background: rgba(20, 20, 30, 0.98);
+  backdrop-filter: blur(30px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
+  border-radius: 20px;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: grab;
-
-  &:active {
-    cursor: grabbing;
-  }
+  pointer-events: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 
   &.card-active {
     z-index: 3;
     transform: scale(1) translateY(0);
+    opacity: 1;
   }
 
   &.card-next {
     z-index: 2;
     transform: scale(0.95) translateY(10px);
-    opacity: 0.8;
-    pointer-events: none;
+    opacity: 0.5;
   }
 
   &.card-behind {
     z-index: 1;
     transform: scale(0.9) translateY(20px);
-    opacity: 0.6;
-    pointer-events: none;
+    opacity: 0.3;
   }
 }
 
 .card-image-container {
   position: relative;
-  height: 400px;
+  height: 360px;
   overflow: hidden;
+  border-radius: 20px 20px 0 0;
 }
 
 .card-image {
@@ -613,24 +508,24 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 50%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  height: 40%;
+  background: linear-gradient(to top, rgba(20, 20, 30, 1) 0%, rgba(20, 20, 30, 0.6) 50%, transparent 100%);
 }
 
 .match-badge {
   position: absolute;
   top: 1rem;
   left: 1rem;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
   color: white;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.9rem;
   border-radius: 20px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   font-weight: 700;
-  font-size: 0.9rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  font-size: 0.85rem;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
 }
 
 .swipe-overlay {
@@ -660,339 +555,203 @@ onMounted(() => {
 }
 
 .card-info {
-  padding: 1.5rem;
+  padding: 1.1rem;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.7rem;
 }
 
 .name-age {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  align-items: baseline;
+  gap: 0.5rem;
 }
 
 .card-name {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: white;
   margin: 0;
+  line-height: 1;
 }
 
 .card-age {
-  font-size: 1.25rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
 }
 
 .location {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .card-bio {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.9rem;
 
   p {
     color: rgba(255, 255, 255, 0.7);
-    font-size: 1rem;
-    line-height: 1.6;
+    font-size: 0.9rem;
+    line-height: 1.4;
     margin: 0;
   }
 }
 
 .music-section {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.9rem;
+
+  &:last-child {
+    margin-bottom: 0.5rem;
+  }
 }
 
 .music-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
 }
 
 .music-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 .artists-chips,
 .genres-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .artist-chip-small,
 .genre-chip-small {
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .action-buttons {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 2rem;
-  padding: 2rem 0;
+  gap: 3rem;
+  padding: 0;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .action-btn {
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   transition: all 0.3s ease;
-
-  &:hover {
+  width: 72px;
+  height: 72px;
+  
+  &:hover:not(:disabled) {
     transform: scale(1.1);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     transform: scale(0.95);
   }
-
-  &.nope-btn {
-    width: 60px;
-    height: 60px;
+  
+  &.dislike-btn {
+    background: #ef4444 !important;
+    
+    &:hover:not(:disabled) {
+      background: #dc2626 !important;
+    }
   }
-
+  
   &.like-btn {
-    width: 80px;
-    height: 80px;
+    background: #22c55e !important;
+    
+    &:hover:not(:disabled) {
+      background: #16a34a !important;
+    }
   }
-
-  &.super-btn {
-    width: 60px;
-    height: 60px;
-  }
-}
-
-.no-cards-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem;
-}
-
-.no-cards-content {
-  text-align: center;
-  animation: fadeInUp 0.6s ease;
-}
-
-.no-cards-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: white;
-  margin: 1.5rem 0 0.5rem;
-}
-
-.no-cards-subtitle {
-  font-size: 1.1rem;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 2rem;
-}
-
-.home-btn {
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-}
-
-.match-modal {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-radius: 32px;
-  padding: 3rem;
-  max-width: 500px;
-}
-
-.match-animation {
-  text-align: center;
-  position: relative;
-}
-
-.match-hearts {
-  position: absolute;
-  top: -80px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 200px;
-  height: 100px;
-}
-
-.heart {
-  position: absolute;
-  color: #ec4899;
-  animation: floatHeart 2s infinite ease-in-out;
-
-  &.heart-1 {
-    left: 20%;
-    animation-delay: 0s;
-  }
-
-  &.heart-2 {
-    left: 50%;
-    transform: translateX(-50%);
-    animation-delay: 0.3s;
-    font-size: 48px;
-  }
-
-  &.heart-3 {
-    right: 20%;
-    animation-delay: 0.6s;
-  }
-}
-
-@keyframes floatHeart {
-
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-
-  50% {
-    transform: translateY(-20px) scale(1.2);
-    opacity: 0.8;
-  }
-}
-
-.match-title {
-  font-size: 2.5rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, #ec4899, #f59e0b);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 1rem 0;
-}
-
-.match-subtitle {
-  font-size: 1.1rem;
-  color: #666;
-  margin-bottom: 2rem;
-}
-
-.match-avatars {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin: 2rem 0;
-}
-
-.match-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 4px solid white;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-}
-
-.heart-connector {
-  animation: pulse 1.5s infinite ease-in-out;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.2);
-  }
-}
-
-.match-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-}
-
-.match-btn {
-  flex: 1;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 
 @media (max-width: 600px) {
   .swipe-container {
-    padding: 0.5rem;
+    padding: 0.75rem;
+    gap: 1rem;
   }
 
   .page-title {
     font-size: 1.5rem;
   }
+  
+  .swipe-header {
+    margin-bottom: 1rem;
+  }
+  
+  .cards-stack {
+    height: 520px;
+  }
 
   .profile-card {
-    border-radius: 16px;
+    max-width: 100%;
+    border-radius: 18px;
   }
 
   .card-image-container {
-    height: 350px;
+    height: 320px;
+    border-radius: 18px 18px 0 0;
+  }
+  
+  .card-info {
+    padding: 1rem;
   }
 
   .card-name {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
+  }
+
+  .card-age {
+    font-size: 1.1rem;
+  }
+
+  .location {
+    font-size: 0.8rem;
+  }
+
+  .card-bio p {
+    font-size: 0.85rem;
+  }
+
+  .music-title {
+    font-size: 0.65rem;
+  }
+
+  .artist-chip-small,
+  .genre-chip-small {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.65rem;
   }
 
   .action-buttons {
-    gap: 1.5rem;
+    gap: 2.5rem;
   }
 
   .action-btn {
-    &.nope-btn {
-      width: 50px;
-      height: 50px;
-    }
-
-    &.like-btn {
-      width: 70px;
-      height: 70px;
-    }
-
-    &.super-btn {
-      width: 50px;
-      height: 50px;
-    }
+    width: 68px;
+    height: 68px;
   }
 
   .match-modal {
