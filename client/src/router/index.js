@@ -6,6 +6,7 @@ import ProtectedView from '@/views/ProtectedView.vue';
 import LandingView from '../views/LandingView.vue';
 import OnboardingPage from '@/views/OnboardingPage.vue';
 import DemoLogin from '../views/DemoLogin.vue';
+import SwipeCard from '../views/SwipeCard.vue';
 import { useAuthStore } from '@/stores/auth.js';
 
 const router = createRouter({
@@ -22,6 +23,11 @@ const router = createRouter({
       path: '/demo-login',
       component: DemoLogin,
       name: 'DemoLogin',
+    },
+    {
+      path: '/swipe',
+      component: SwipeCard,
+      name: 'SwipeCard',
     },
   ],
 });

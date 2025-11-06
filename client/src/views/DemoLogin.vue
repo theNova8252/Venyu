@@ -129,9 +129,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const $q = useQuasar()
+const userStore = useUserStore()
 
 const step = ref('login')
 const formData = ref({
@@ -156,14 +158,6 @@ const selectedGenres = ref([])
 const selectedArtists = ref([])
 
 const handleSignup = () => {
-  // Save form data
-  localStorage.setItem('venyu_demo_user', JSON.stringify({
-    firstName: formData.value.firstName,
-    lastName: formData.value.lastName,
-    birthday: formData.value.birthday,
-    createdAt: new Date().toISOString()
-  }))
-
   // Animate to next step
   step.value = 'preferences'
 }
@@ -187,11 +181,23 @@ const toggleArtist = (artist) => {
 }
 
 const completeSetup = () => {
-  // Save preferences
-  const userData = JSON.parse(localStorage.getItem('venyu_demo_user') || '{}')
-  userData.genres = selectedGenres.value
-  userData.artists = selectedArtists.value
+  // Create complete user profile
+  const userData = {
+    id: 'demo-user',
+    name: `${formData.value.firstName} ${formData.value.lastName}`,
+    firstName: formData.value.firstName,
+    lastName: formData.value.lastName,
+    birthday: formData.value.birthday,
+    topArtists: selectedArtists.value.length > 0 ? selectedArtists.value : ['Fred again..'],
+    genres: selectedGenres.value.length > 0 ? selectedGenres.value : ['electropop'],
+    createdAt: new Date().toISOString()
+  }
+
+  // Save to localStorage
   localStorage.setItem('venyu_demo_user', JSON.stringify(userData))
+
+  // Update the user store
+  userStore.setUser(userData)
 
   $q.notify({
     type: 'positive',
@@ -200,7 +206,7 @@ const completeSetup = () => {
     timeout: 2000
   })
 
-  // Navigate to main app (adjust route name as needed)
+  // Navigate to main app
   setTimeout(() => {
     router.push({ name: 'Home' })
   }, 500)
