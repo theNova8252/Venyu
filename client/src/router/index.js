@@ -11,7 +11,7 @@ import { useAuthStore } from '@/stores/auth.js';
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: HomeView },
+    { path: '/', component: LandingView },
     { path: '/login', component: LoginView },
     { path: '/home', name: 'Home', component: HomeView },
     { path: '/callback', component: CallbackView },
