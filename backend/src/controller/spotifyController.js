@@ -1,11 +1,11 @@
 import dotenv from 'dotenv';
-import asyncHandler from 'express-async-handler';
 import {
   buildAuthUrl,
   exchangeCodeForTokens,
   refreshAccessToken,
   fetchMe,
 } from '../model/spotifyModel.js';
+import User from '../model/User.js';
 
 dotenv.config();
 
@@ -13,93 +13,166 @@ const COOKIE_OPTS_BASE = {
   httpOnly: true,
   sameSite: 'lax',
   secure: process.env.NODE_ENV === 'production',
+  path: '/',
 };
 
-export const login = asyncHandler(async (req, res) => {
+export const login = (req, res) => {
   const state = req.query.state || '';
   return res.redirect(buildAuthUrl(state));
-});
+};
 
-export const callback = asyncHandler(async (req, res) => {
-  const { code, error } = req.query;
-  if (error) return res.status(400).json({ error });
+export const callback = async (req, res, next) => {
+  try {
+    const { code, error } = req.query;
+    if (error) return res.status(400).json({ error });
+    if (!code) return res.status(400).json({ error: 'missing_code' });
 
-  const tokens = await exchangeCodeForTokens(code);
-  const { access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn } = tokens;
+    const tokens = await exchangeCodeForTokens(code);
+    const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-  // set httpOnly cookies
-  res.cookie('rt', refreshToken, {
-    ...COOKIE_OPTS_BASE,
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-  });
-  res.cookie('at', accessToken, {
-    ...COOKIE_OPTS_BASE,
-    maxAge: expiresIn * 1000, // ~1 hour
-  });
+    const me = await fetchMe(tokens.access_token);
+    const avatar = me.images?.[0]?.url || null;
 
-  // send them to onboarding
-  const redirectTo = `${process.env.FRONTEND_URL}/onboarding`;
-  return res.redirect(302, redirectTo);
-});
+    const [user, created] = await User.upsert(
+      {
+        spotify_id: me.id,
+        display_name: me.display_name || null,
+        email: me.email || null,
+        avatar_url: avatar,
+        country: me.country || null,
+        product: me.product || null,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token ?? null,
+        token_expires_at: expiresAt,
+      },
+      { returning: true, conflictFields: ['spotify_id'] },
+    );
 
-export const refresh = asyncHandler(async (req, res) => {
-  // allow either body refresh_token OR cookie
-  const refreshToken = req.body?.refresh_token || req.cookies?.rt;
-  if (!refreshToken) {
-    return res.status(400).json({ error: 'refresh_token required' });
-  }
-
-  const refreshed = await refreshAccessToken(refreshToken);
-  const {
-    access_token: accessToken,
-    refresh_token: newRefreshToken,
-    expires_in: expiresIn,
-  } = refreshed;
-
-  // rotate cookies if we got a new refresh token
-  if (newRefreshToken) {
-    res.cookie('rt', newRefreshToken, {
+    if (tokens.refresh_token) {
+      res.cookie('rt', tokens.refresh_token, {
+        ...COOKIE_OPTS_BASE,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+    }
+    res.cookie('at', tokens.access_token, {
       ...COOKIE_OPTS_BASE,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: tokens.expires_in * 1000,
     });
+
+    return res.status(200).json({
+      message: created ? 'user_created' : 'user_updated',
+      user: {
+        id: user.id,
+        spotify_id: user.spotify_id,
+        display_name: user.display_name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        product: user.product,
+        country: user.country,
+      },
+    });
+  } catch (err) {
+    return next(err);
   }
+};
 
-  res.cookie('at', accessToken, {
-    ...COOKIE_OPTS_BASE,
-    maxAge: expiresIn * 1000,
-  });
+export const me = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
 
-  return res.status(200).json({
-    accessToken,
-    expiresIn,
-  });
-});
+    const profile = await fetchMe(at);
+    const user = await User.findOne({ where: { spotify_id: profile.id } });
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
 
-export const me = asyncHandler(async (req, res) => {
-  // 1) try Authorization: Bearer ...
-  const auth = req.headers.authorization || '';
-  let token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+    return res.json({
+      id: user.id,
+      display_name: user.display_name,
+      email: user.email,
+      avatar_url: user.avatar_url,
+      country: user.country,
+      product: user.product,
+    });
+  } catch (e) {
+    return next(e);
+  }
+};
 
-  // 2) else try to mint from refresh cookie transparently
-  if (!token && req.cookies?.rt) {
-    const minted = await refreshAccessToken(req.cookies.rt);
-    const { access_token: accessToken, expires_in: expiresIn } = minted;
+/**
+ * POST /auth/refresh
+ * Nimmt Refresh-Token aus Cookie 'rt' (oder req.body.refresh_token),
+ * holt neues Access-Token, aktualisiert DB & setzt neues 'at'-Cookie.
+ */
+export const refresh = async (req, res, next) => {
+  try {
+    const cookieRt = (req.cookies && req.cookies.rt) || null;
+    const bodyRt = (req.body && req.body.refresh_token) || null;
+    const rt = bodyRt || cookieRt;
 
-    token = accessToken;
-    res.cookie('at', accessToken, {
+    if (!rt) return res.status(400).json({ error: 'missing_refresh_token' });
+
+    const data = await refreshAccessToken(rt); // { access_token, expires_in, refresh_token? }
+    const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+
+    // Wer ist der User? -> /me mit neuem Access-Token
+    const profile = await fetchMe(data.access_token);
+
+    // DB updaten
+    const updates = {
+      access_token: data.access_token,
+      token_expires_at: expiresAt,
+    };
+    if (data.refresh_token) updates.refresh_token = data.refresh_token;
+
+    await User.update(updates, { where: { spotify_id: profile.id } });
+
+    // Cookies setzen
+    if (data.refresh_token) {
+      res.cookie('rt', data.refresh_token, {
+        ...COOKIE_OPTS_BASE,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+    }
+    res.cookie('at', data.access_token, {
       ...COOKIE_OPTS_BASE,
-      maxAge: expiresIn * 1000,
+      maxAge: data.expires_in * 1000,
     });
+
+    return res.json({
+      access_token: data.access_token,
+      expires_in: data.expires_in,
+      refreshed: true,
+    });
+  } catch (err) {
+    return next(err);
   }
+};
 
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+/**
+ * POST /auth/logout
+ * Cookies löschen und (optional) Tokens in DB invalidieren.
+ */
+export const logout = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    // Optional: User in DB finden und Tokens leeren
+    if (at) {
+      try {
+        const profile = await fetchMe(at);
+        await User.update(
+          { access_token: null, refresh_token: null, token_expires_at: null },
+          { where: { spotify_id: profile.id } },
+        );
+      } catch {
+        // Wenn /me mit abgelaufenem Token fehlschlägt, ignorieren wir das hier.
+      }
+    }
 
-  const profile = await fetchMe(token);
-  return res.status(200).json(profile);
-});
+    res.clearCookie('at', { path: '/' });
+    res.clearCookie('rt', { path: '/' });
 
-export const logout = asyncHandler(async (req, res) => {
-  res.clearCookie('rt', COOKIE_OPTS_BASE);
-  res.clearCookie('at', COOKIE_OPTS_BASE);
-  return res.status(204).end();
-});
+    return res.json({ success: true });
+  } catch (err) {
+    return next(err);
+  }
+};

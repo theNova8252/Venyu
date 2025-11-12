@@ -661,7 +661,7 @@ onMounted(() => {
   transition: all 0.3s ease;
   width: 72px;
   height: 72px;
-  
+
   &:hover:not(:disabled) {
     transform: scale(1.1);
   }
@@ -669,18 +669,18 @@ onMounted(() => {
   &:active:not(:disabled) {
     transform: scale(0.95);
   }
-  
+
   &.dislike-btn {
     background: #ef4444 !important;
-    
+
     &:hover:not(:disabled) {
       background: #dc2626 !important;
     }
   }
-  
+
   &.like-btn {
     background: #22c55e !important;
-    
+
     &:hover:not(:disabled) {
       background: #16a34a !important;
     }
@@ -696,11 +696,11 @@ onMounted(() => {
   .page-title {
     font-size: 1.5rem;
   }
-  
+
   .swipe-header {
     margin-bottom: 1rem;
   }
-  
+
   .cards-stack {
     height: 520px;
   }
@@ -714,7 +714,7 @@ onMounted(() => {
     height: 320px;
     border-radius: 18px 18px 0 0;
   }
-  
+
   .card-info {
     padding: 1rem;
   }
@@ -767,4 +767,4 @@ onMounted(() => {
     height: 100px;
   }
 }
-</style>
+</style>«

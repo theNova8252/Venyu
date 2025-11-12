@@ -114,7 +114,6 @@
           </div>
         </div>
 
-        <!-- Floating Elements -->
         <div class="floating-shapes">
           <div class="shape shape-1"></div>
           <div class="shape shape-2"></div>

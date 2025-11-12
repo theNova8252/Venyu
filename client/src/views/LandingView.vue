@@ -257,7 +257,7 @@
         <q-separator class="q-my-lg footer-separator" />
 
         <div class="text-center text-grey-6">
-          <p>&copy; 2025 Venyu. All rights reserved. Made with music and code.</p>
+          <p>&copy; 2025 Letzte Reihe GmbH. All rights reserved. Made with music and code.</p>
           <p class="text-caption q-mt-sm">
             This product uses the Spotify API but is not endorsed or certified by Spotify.
           </p>
