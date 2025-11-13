@@ -34,6 +34,9 @@ export const getMeProfile = async (req, res, next) => {
       product: user.product,
       bio: user.bio,
       is_visible: user.isVisible,
+      genres: user.genres,
+      top_artists: user.topArtists,
+      top_tracks: user.topTracks,
       spotify: { id: sp.id, display_name: sp.display_name, followers: sp.followers?.total ?? 0 },
     });
   } catch (e) {
@@ -77,6 +80,47 @@ export const uploadAvatar = async (req, res, next) => {
 
     return res.json({ avatar_url: relPath });
   } catch (e) {
+    return next(e);
+  }
+};
+
+export const deleteAccount = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
+
+    const sp = await fetchMe(at);
+    const user = await User.findOne({ where: { spotifyId: sp.id } });
+
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+
+    // Clean up avatar file if exists
+    if (user.avatarUrl) {
+      const avatarPath = path.join(process.cwd(), user.avatarUrl.replace(/^\//, ''));
+      if (fs.existsSync(avatarPath)) {
+        try {
+          fs.unlinkSync(avatarPath);
+          console.log(`Deleted avatar file: ${avatarPath}`);
+        } catch (fileError) {
+          console.warn(`Failed to delete avatar file: ${fileError.message}`);
+        }
+      }
+    }
+
+    await user.destroy();
+
+    res.clearCookie('at', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+
+    return res.json({
+      deleted: true,
+      message: 'Account successfully deleted',
+    });
+  } catch (e) {
+    console.error('Delete account error:', e);
     return next(e);
   }
 };

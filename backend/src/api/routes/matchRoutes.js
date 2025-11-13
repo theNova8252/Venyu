@@ -1,4 +1,3 @@
-// backend/src/api/routes/matchRoutes.js
 import { Router } from 'express';
 import { Op } from 'sequelize';
 import User from '../../model/User.js';
@@ -61,7 +60,7 @@ router.get('/candidates', async (req, res, next) => {
     if (e.status) {
       return res.status(e.status).json({ error: e.message });
     }
-    next(e);
+    return next(e);
   }
 });
 
@@ -107,7 +106,7 @@ router.post('/:otherUserId/like', async (req, res, next) => {
     if (e.status) {
       return res.status(e.status).json({ error: e.message });
     }
-    next(e);
+    return next(e);
   }
 });
 

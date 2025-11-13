@@ -1,4 +1,3 @@
-// src/model/User.js
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from './db.js';
 
@@ -17,6 +16,9 @@ User.init(
     tokenExpiresAt: { type: DataTypes.DATE, field: 'token_expires_at' },
     bio: { type: DataTypes.TEXT },
     isVisible: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_visible' },
+    topArtists: { type: DataTypes.JSONB, field: 'top_artists' },
+    topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
+    genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
   },
   {
     sequelize,

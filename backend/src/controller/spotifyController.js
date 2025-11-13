@@ -5,6 +5,8 @@ import {
   exchangeCodeForTokens,
   refreshAccessToken,
   fetchMe,
+  fetchTopArtists,
+  fetchTopTracks,
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 
@@ -30,41 +32,80 @@ export const callback = async (req, res) => {
     if (!code) return res.status(400).send('Missing code');
 
     const tokens = await exchangeCodeForTokens(code);
-    const me = await fetchMe(tokens.access_token);
+
+    // Fetch Spotify data in parallel to speed it up
+    const [me, topArtistsRes, topTracksRes] = await Promise.all([
+      fetchMe(tokens.access_token),
+      fetchTopArtists(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
+      fetchTopTracks(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
+    ]);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    // ⚠ Wichtig: spotifyId (JS-Name), nicht spotify_id
+    // 🔎 Normalize artists
+    const topArtists = topArtistsRes.items.map((a) => ({
+      id: a.id,
+      name: a.name,
+      genres: a.genres,
+      popularity: a.popularity,
+      image: a.images?.[0]?.url ?? null,
+      uri: a.uri,
+    }));
+
+    // 🔎 Normalize tracks
+    const topTracks = topTracksRes.items.map((t) => ({
+      id: t.id,
+      name: t.name,
+      uri: t.uri,
+      previewUrl: t.preview_url,
+      durationMs: t.duration_ms,
+      popularity: t.popularity,
+      album: {
+        id: t.album?.id,
+        name: t.album?.name,
+        image: t.album?.images?.[0]?.url ?? null,
+      },
+      artists:
+        t.artists?.map((a) => ({
+          id: a.id,
+          name: a.name,
+          uri: a.uri,
+        })) ?? [],
+    }));
+
+    // 🎧 Derive a flat set of genres from top artists
+    const genresSet = new Set();
+    topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
+    const genres = Array.from(genresSet);
+
+    // Upsert user by spotifyId (JS: spotifyId, NOT spotify_id)
     let user = await User.findOne({ where: { spotifyId: me.id } });
 
+    const userPayload = {
+      displayName: me.display_name ?? null,
+      email: me.email ?? null,
+      avatarUrl: me.images?.[0]?.url ?? null,
+      country: me.country ?? null,
+      product: me.product ?? null,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
+      tokenExpiresAt: expiresAt,
+      topArtists,
+      topTracks,
+      genres,
+    };
+
     if (user) {
-      await user.update({
-        displayName: me.display_name ?? null,
-        email: me.email ?? null,
-        avatarUrl: me.images?.[0]?.url ?? null,
-        country: me.country ?? null,
-        product: me.product ?? null,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? user.refreshToken,
-        tokenExpiresAt: expiresAt,
-      });
+      await user.update(userPayload);
     } else {
       user = await User.create({
+        ...userPayload,
         spotifyId: me.id,
-        displayName: me.display_name ?? null,
-        email: me.email ?? null,
-        avatarUrl: me.images?.[0]?.url ?? null,
-        country: me.country ?? null,
-        product: me.product ?? null,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token ?? null,
-        tokenExpiresAt: expiresAt,
       });
     }
 
     console.log('User upserted:', user.id, user.spotifyId);
 
-    // Cookies setzen
     res.cookie('at', tokens.access_token, {
       ...COOKIE_OPTS_BASE,
       maxAge: tokens.expires_in * 1000,
@@ -77,12 +118,9 @@ export const callback = async (req, res) => {
       });
     }
 
-    // Redirect zurück zum Frontend
     const ret = (() => {
       try {
-        return JSON.parse(
-          Buffer.from(state || '', 'base64').toString()
-        )?.returnTo;
+        return JSON.parse(Buffer.from(state || '', 'base64').toString())?.returnTo;
       } catch {
         return null;
       }
@@ -113,12 +151,14 @@ export const me = async (req, res, next) => {
       avatar_url: user.avatarUrl,
       country: user.country,
       product: user.product,
+      top_artists: user.topArtists,
+      top_tracks: user.topTracks,
+      genres: user.genres,
     });
   } catch (e) {
     return next(e);
   }
 };
-
 // ======================= REFRESH =====================
 export const refresh = async (req, res, next) => {
   try {
@@ -162,13 +202,12 @@ export const refresh = async (req, res, next) => {
   }
 };
 
-// ======================= LOGOUT ======================
 export const logout = async (req, res, next) => {
   try {
     res.clearCookie('at', { path: '/' });
     res.clearCookie('rt', { path: '/' });
     return res.json({ success: true });
   } catch (err) {
-    next(err);
+    return next(err);
   }
 };

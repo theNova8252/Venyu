@@ -1,22 +1,18 @@
-// client/src/stores/user.js
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed } from 'vue';
+import { useAuthStore } from './auth';
 
 export const useUserStore = defineStore('user', () => {
-  const me = ref(null);
+  const auth = useAuthStore();
+
+  const me = computed(() => auth.user);
 
   const fetchMe = async () => {
-    try {
-      const res = await fetch('/api/user/me', { credentials: 'include' });
-      if (!res.ok) return;
-      me.value = await res.json();
-    } catch (error) {
-      console.error('Failed to fetch user from API', error);
-    }
+    await auth.fetchMe();
   };
 
   const setUser = (userData) => {
-    me.value = userData;
+    auth.user = userData;
   };
 
   return {

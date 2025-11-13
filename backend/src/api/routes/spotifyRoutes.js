@@ -1,4 +1,3 @@
-// backend/src/api/routes/spotifyRoutes.js
 import express from 'express';
 import { login, callback, refresh, me, logout } from '../../controller/spotifyController.js';
 

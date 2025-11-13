@@ -1,9 +1,7 @@
-// src/controller/chatController.js
 import ChatMessage from '../model/ChatMessage.js';
 import { fetchMe } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 
-// Hilfsfunktion: aktuellen User anhand des Access-Tokens ermitteln
 async function getCurrentUser(req) {
   const { at } = req.cookies || {};
   if (!at) {
@@ -41,13 +39,13 @@ export async function listMessages(req, res, next) {
       return obj;
     });
 
-    res.json(result);
+    return res.json(result);
   } catch (err) {
     // falls wir oben status gesetzt haben, sauber zurückgeben
     if (err.status) {
       return res.status(err.status).json({ error: err.message });
     }
-    next(err);
+    return next(err);
   }
 }
 
@@ -71,11 +69,11 @@ export async function createMessage(req, res, next) {
     const obj = msg.toJSON();
     obj.isMine = true; // gerade gesendet → immer von mir
 
-    res.status(201).json(obj);
+    return res.status(201).json(obj);
   } catch (err) {
     if (err.status) {
       return res.status(err.status).json({ error: err.message });
     }
-    next(err);
+    return next(err);
   }
 }

@@ -1,6 +1,5 @@
 <template>
   <q-page class="venyu-landing">
-    <!-- Animated Background -->
     <div class="animated-bg">
       <div class="gradient-orb orb-1"></div>
       <div class="gradient-orb orb-2"></div>
@@ -9,10 +8,8 @@
       <div class="noise-overlay"></div>
     </div>
 
-    <!-- Particles Canvas -->
     <canvas ref="particlesCanvas" class="particles-canvas"></canvas>
 
-    <!-- Hero Section -->
     <section class="hero-section" ref="heroSection">
       <div class="container">
         <div class="text-center q-pt-xl q-pb-xl fade-in-up" :class="{ 'visible': visibleSections.has('hero') }">
@@ -25,8 +22,6 @@
             Find your rhythm with Venyu – the ultimate app to discover music events and connect with like-minded fans
           </p>
           <div class="cta-buttons">
-            <q-btn unelevated size="lg" class="cta-primary flex items-center justify-center gap-3" label="Start Demo"
-              @click="startDemo" />
             <q-btn outline size="lg" class="cta-secondary glass-btn flex items-center justify-center gap-3"
               @click="onSpotifyConnect">
               <template v-slot:default>
@@ -39,7 +34,6 @@
         </div>
       </div>
 
-      <!-- 3D Floating Elements -->
       <div class="floating-elements">
         <div class="float-item item-1">
           <div class="vinyl-record rotating"></div>
@@ -52,7 +46,6 @@
         </div>
       </div>
 
-      <!-- Scroll Indicator -->
       <div class="scroll-indicator">
         <div class="mouse">
           <div class="wheel"></div>
@@ -61,7 +54,6 @@
       </div>
     </section>
 
-    <!-- Features Section -->
     <section class="features-section q-py-xl" ref="featuresSection">
       <div class="container">
         <div class="text-center q-mb-xl fade-in-up" :class="{ 'visible': visibleSections.has('features') }">
@@ -91,7 +83,6 @@
         </div>
       </div>
 
-      <!-- Parallax Shapes -->
       <div class="parallax-shapes">
         <div class="shape shape-1"></div>
         <div class="shape shape-2"></div>
@@ -99,7 +90,6 @@
       </div>
     </section>
 
-    <!-- App Preview Section -->
     <section class="preview-section q-py-xl" ref="previewSection">
       <div class="container">
         <div class="text-center q-mb-xl fade-in-up" :class="{ 'visible': visibleSections.has('preview') }">
@@ -155,7 +145,6 @@
       </div>
     </section>
 
-    <!-- Testimonial Section -->
     <section class="testimonial-section q-py-xl" ref="testimonialsSection">
       <div class="container">
         <div class="text-center q-mb-xl fade-in-up" :class="{ 'visible': visibleSections.has('testimonials') }">
@@ -191,7 +180,6 @@
       </div>
     </section>
 
-    <!-- CTA Section -->
     <section class="cta-section q-py-xl" ref="ctaSection">
       <div class="container text-center">
         <div class="cta-content fade-in-up" :class="{ 'visible': visibleSections.has('cta') }">
@@ -207,7 +195,6 @@
 
         </div>
 
-        <!-- Stats Counter -->
         <div class="stats-row q-mt-xl fade-in-up" :class="{ 'visible': visibleSections.has('cta') }">
           <div class="stat-item" v-for="stat in stats" :key="stat.label">
             <div class="stat-number" :data-target="stat.value">{{ animatedStats[stat.label] }}</div>
@@ -217,7 +204,6 @@
       </div>
     </section>
 
-    <!-- Footer -->
     <footer class="footer q-py-xl">
       <div class="container">
         <div class="row q-col-gutter-lg">
@@ -275,14 +261,15 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useMatchesStore } from '@/stores/matches'
 import { useEventsStore } from '@/stores/events'
+import { useAuthStore } from '@/stores/auth'
 
 const $q = useQuasar()
 const router = useRouter()
 const user = useUserStore()
 const matches = useMatchesStore()
 const events = useEventsStore()
+const auth = useAuthStore()
 
-// Refs used in template
 const particlesCanvas = ref(null)
 const heroSection = ref(null)
 const featuresSection = ref(null)
@@ -292,8 +279,6 @@ const ctaSection = ref(null)
 const featureCards = ref([])
 const visibleSections = ref(new Set())
 
-/* ---------- Static data ---------- */
-// ---------- Static data ----------
 const features = ref([
   {
     icon: 'headphones',
@@ -347,36 +332,12 @@ const stats = ref([
 
 const animatedStats = ref({})
 
-async function startDemo() {
-  try {
-    $q.loading?.show()
-    await user.fetchMe()
-    await matches.fetchMatches()
-    await events.fetchNearby()
-    router.push({ name: 'DemoLogin' })
-  } finally {
-    $q.loading?.hide()
-  }
-}
 
 const API = import.meta.env.VITE_API_BASE || ''
 
 const onSpotifyConnect = () => {
-  if (IS_DEMO) {
-    $q.notify({
-      type: 'info',
-      message: 'Demo mode is active — use "Start Demo" to explore without Spotify.'
-    })
-    return
-  }
-
-  const state = btoa(JSON.stringify({
-    returnTo: `${location.origin}/profile`
-  }))
-
-  const base = API || ''
-  window.location.href = `${base}/api/spotify/auth/login?state=${encodeURIComponent(state)}`
-}
+  auth.login("/profile"); 
+};
 
 const setupIntersectionObserver = () => {
   const observer = new IntersectionObserver(
@@ -526,7 +487,6 @@ function scrollToTop() {
   setVerticalScrollPosition(target, 0, 600)
 }
 
-/* ---------- Lifecycle ---------- */
 onMounted(() => {
   initParticles()
   setupIntersectionObserver()

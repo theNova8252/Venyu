@@ -1,4 +1,3 @@
-// src/api/routes/chatRoutes.js
 import { Router } from 'express';
 import { listMessages, createMessage } from '../../controller/chatController.js';
 

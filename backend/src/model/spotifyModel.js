@@ -19,6 +19,30 @@ function basicAuthHeader() {
   const b64 = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
   return `Basic ${b64}`;
 }
+async function spotifyGet(accessToken, path, params = {}) {
+  const url = new URL(`https://api.spotify.com/v1${path}`);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v != null) url.searchParams.set(k, String(v));
+  });
+
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Spotify GET ${path} failed: ${res.status} ${text}`);
+  }
+  return res.json();
+}
+export const fetchTopArtists = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/top/artists', { time_range: timeRange, limit });
+
+export const fetchTopTracks = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/top/tracks', { time_range: timeRange, limit });
+
+export const fetchPlaylists = (accessToken, { limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/playlists', { limit });
 
 async function postToken(params) {
   const res = await fetch(TOKEN_URL, {
