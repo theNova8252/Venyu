@@ -1,3 +1,4 @@
+// backend/src/controller/spotifyController.js
 import dotenv from 'dotenv';
 import {
   buildAuthUrl,
@@ -16,23 +17,26 @@ const COOKIE_OPTS_BASE = {
   path: '/',
 };
 
+// ======================= LOGIN =======================
 export const login = (req, res) => {
   const state = req.query.state || '';
   return res.redirect(buildAuthUrl(state));
 };
 
+// ======================= CALLBACK ====================
 export const callback = async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!code) return res.status(400).send('Missing code');
 
     const tokens = await exchangeCodeForTokens(code);
-    const me = await fetchMe(tokens.access_token); // Spotify /me
+    const me = await fetchMe(tokens.access_token);
 
-    // insert or update user
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
+    // ⚠ Wichtig: spotifyId (JS-Name), nicht spotify_id
     let user = await User.findOne({ where: { spotifyId: me.id } });
+
     if (user) {
       await user.update({
         displayName: me.display_name ?? null,
@@ -58,10 +62,14 @@ export const callback = async (req, res) => {
       });
     }
 
+    console.log('User upserted:', user.id, user.spotifyId);
+
+    // Cookies setzen
     res.cookie('at', tokens.access_token, {
       ...COOKIE_OPTS_BASE,
       maxAge: tokens.expires_in * 1000,
     });
+
     if (tokens.refresh_token) {
       res.cookie('rt', tokens.refresh_token, {
         ...COOKIE_OPTS_BASE,
@@ -69,36 +77,40 @@ export const callback = async (req, res) => {
       });
     }
 
-    // redirect back to app
+    // Redirect zurück zum Frontend
     const ret = (() => {
       try {
-        return JSON.parse(Buffer.from(state || '', 'base64').toString())?.returnTo;
+        return JSON.parse(
+          Buffer.from(state || '', 'base64').toString()
+        )?.returnTo;
       } catch {
         return null;
       }
     })();
+
     const to = ret || process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
     return res.redirect(to);
   } catch (e) {
-    console.error('Callback error:', e); // <-- log full error
+    console.error('Callback error:', e);
     return res.status(500).send(e?.message || 'Error');
   }
 };
 
+// ======================= ME ==========================
 export const me = async (req, res, next) => {
   try {
     const { at } = req.cookies || {};
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
-    const profile = await fetchMe(at);
-    const user = await User.findOne({ where: { spotify_id: profile.id } });
+    const profile = await fetchMe(at); // Spotify-Profil
+    const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
     return res.json({
       id: user.id,
-      display_name: user.display_name,
+      display_name: user.displayName,
       email: user.email,
-      avatar_url: user.avatar_url,
+      avatar_url: user.avatarUrl,
       country: user.country,
       product: user.product,
     });
@@ -107,11 +119,7 @@ export const me = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/refresh
- * Nimmt Refresh-Token aus Cookie 'rt' (oder req.body.refresh_token),
- * holt neues Access-Token, aktualisiert DB & setzt neues 'at'-Cookie.
- */
+// ======================= REFRESH =====================
 export const refresh = async (req, res, next) => {
   try {
     const cookieRt = (req.cookies && req.cookies.rt) || null;
@@ -120,22 +128,19 @@ export const refresh = async (req, res, next) => {
 
     if (!rt) return res.status(400).json({ error: 'missing_refresh_token' });
 
-    const data = await refreshAccessToken(rt); // { access_token, expires_in, refresh_token? }
+    const data = await refreshAccessToken(rt);
     const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
-    // Wer ist der User? -> /me mit neuem Access-Token
     const profile = await fetchMe(data.access_token);
 
-    // DB updaten
     const updates = {
-      access_token: data.access_token,
-      token_expires_at: expiresAt,
+      accessToken: data.access_token,
+      tokenExpiresAt: expiresAt,
     };
-    if (data.refresh_token) updates.refresh_token = data.refresh_token;
+    if (data.refresh_token) updates.refreshToken = data.refresh_token;
 
-    await User.update(updates, { where: { spotify_id: profile.id } });
+    await User.update(updates, { where: { spotifyId: profile.id } });
 
-    // Cookies setzen
     if (data.refresh_token) {
       res.cookie('rt', data.refresh_token, {
         ...COOKIE_OPTS_BASE,
@@ -157,31 +162,13 @@ export const refresh = async (req, res, next) => {
   }
 };
 
-/**
- * POST /auth/logout
- * Cookies löschen und (optional) Tokens in DB invalidieren.
- */
+// ======================= LOGOUT ======================
 export const logout = async (req, res, next) => {
   try {
-    const { at } = req.cookies || {};
-    // Optional: User in DB finden und Tokens leeren
-    if (at) {
-      try {
-        const profile = await fetchMe(at);
-        await User.update(
-          { access_token: null, refresh_token: null, token_expires_at: null },
-          { where: { spotify_id: profile.id } },
-        );
-      } catch {
-        // Wenn /me mit abgelaufenem Token fehlschlägt, ignorieren wir das hier.
-      }
-    }
-
     res.clearCookie('at', { path: '/' });
     res.clearCookie('rt', { path: '/' });
-
     return res.json({ success: true });
   } catch (err) {
-    return next(err);
+    next(err);
   }
 };

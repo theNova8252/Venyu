@@ -25,8 +25,14 @@
             <q-icon name="check_circle" size="80px" color="green-5" />
             <h2 class="no-cards-title">You're all caught up!</h2>
             <p class="no-cards-subtitle">Check back later for more matches</p>
-            <q-btn unelevated color="purple-5" label="Back to Home" @click="$router.push({ name: 'Home' })" no-caps
-              class="home-btn" />
+            <q-btn
+              unelevated
+              color="purple-5"
+              label="Back to Home"
+              @click="$router.push({ name: 'Home' })"
+              no-caps
+              class="home-btn"
+            />
           </div>
         </div>
       </transition>
@@ -34,11 +40,17 @@
       <!-- Cards Stack -->
       <div v-if="currentCardIndex < cards.length" class="cards-stack">
         <!-- Background cards for depth -->
-        <div v-for="(card, index) in visibleCards" :key="card.id" class="profile-card" :class="{
-          'card-active': index === 0,
-          'card-next': index === 1,
-          'card-behind': index === 2
-        }" :style="getCardStyle(index)">
+        <div
+          v-for="(card, index) in visibleCards"
+          :key="card.id"
+          class="profile-card"
+          :class="{
+            'card-active': index === 0,
+            'card-next': index === 1,
+            'card-behind': index === 2,
+          }"
+          :style="getCardStyle(index)"
+        >
           <!-- Card Content -->
           <div class="card-image-container">
             <img :src="card.avatar" :alt="card.name" class="card-image" />
@@ -75,7 +87,11 @@
                 <span class="music-title">Top Artists</span>
               </div>
               <div class="artists-chips">
-                <div v-for="artist in card.topArtists.slice(0, 3)" :key="artist" class="artist-chip-small">
+                <div
+                  v-for="artist in card.topArtists.slice(0, 3)"
+                  :key="artist"
+                  class="artist-chip-small"
+                >
                   {{ artist }}
                 </div>
               </div>
@@ -87,7 +103,11 @@
                 <span class="music-title">Genres</span>
               </div>
               <div class="genres-chips">
-                <div v-for="genre in card.genres.slice(0, 4)" :key="genre" class="genre-chip-small">
+                <div
+                  v-for="genre in card.genres.slice(0, 4)"
+                  :key="genre"
+                  class="genre-chip-small"
+                >
                   {{ genre }}
                 </div>
               </div>
@@ -98,13 +118,27 @@
 
       <!-- Action Buttons -->
       <div v-if="currentCardIndex < cards.length" class="action-buttons">
-        <q-btn round size="xl" icon="close" color="red-5" class="action-btn dislike-btn" @click="swipeLeft"
-          :disable="isAnimating">
+        <q-btn
+          round
+          size="xl"
+          icon="close"
+          color="red-5"
+          class="action-btn dislike-btn"
+          @click="swipeLeft"
+          :disable="isAnimating"
+        >
           <q-tooltip>Dislike</q-tooltip>
         </q-btn>
 
-        <q-btn round size="xl" icon="favorite" color="green-5" class="action-btn like-btn" @click="swipeRight"
-          :disable="isAnimating">
+        <q-btn
+          round
+          size="xl"
+          icon="favorite"
+          color="green-5"
+          class="action-btn like-btn"
+          @click="swipeRight"
+          :disable="isAnimating"
+        >
           <q-tooltip>Like</q-tooltip>
         </q-btn>
       </div>
@@ -120,20 +154,41 @@
             <q-icon name="favorite" class="heart heart-3" />
           </div>
           <h2 class="match-title">It's a Match! 🎉</h2>
-          <p class="match-subtitle">You and {{ lastMatchedUser?.name }} both liked each other</p>
+          <p class="match-subtitle">
+            You and {{ lastMatchedUser?.name }} both liked each other
+          </p>
 
           <div class="match-avatars">
-            <img :src="`https://i.pravatar.cc/150?img=${userStore.me?.firstName?.charCodeAt(0) % 70 || 1}`"
-              class="match-avatar" />
+            <img
+              :src="
+                userStore.me?.avatarUrl || 'https://i.pravatar.cc/150?img=1'
+              "
+              class="match-avatar"
+            />
+
             <div class="heart-connector">
               <q-icon name="favorite" size="40px" color="pink-5" />
             </div>
-            <img :src="lastMatchedUser?.avatar" class="match-avatar" />
+            <img :src="lastMatchedUser.avatar" class="match-avatar" />
           </div>
 
           <div class="match-actions">
-            <q-btn outline color="grey-7" label="Keep Swiping" @click="closeMatchModal" no-caps class="match-btn" />
-            <q-btn unelevated color="purple-5" label="Send Message" @click="sendMessage" no-caps class="match-btn" />
+            <q-btn
+              outline
+              color="grey-7"
+              label="Keep Swiping"
+              @click="closeMatchModal"
+              no-caps
+              class="match-btn"
+            />
+            <q-btn
+              unelevated
+              color="purple-5"
+              label="Send Message"
+              @click="sendMessage"
+              no-caps
+              class="match-btn"
+            />
           </div>
         </div>
       </q-card>
@@ -142,209 +197,146 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useQuasar } from 'quasar'
-import { useUserStore } from '@/stores/user'
+import { ref, computed, onMounted } from "vue";
+import { useQuasar } from "quasar";
+import { useUserStore } from "@/stores/user";
+import { useRouter } from "vue-router";
+import { useMatchesStore } from "@/stores/matches";
+import { useChatsStore } from "@/stores/chats";
 
-const router = useRouter()
-const $q = useQuasar()
-const userStore = useUserStore()
+const $q = useQuasar();
+const userStore = useUserStore();
+const router = useRouter();
+const matchesStore = useMatchesStore();
 
-const showFilters = ref(false)
-const currentCardIndex = ref(0)
-const isAnimating = ref(false)
-const isDragging = ref(false)
-const dragStartX = ref(0)
-const dragStartY = ref(0)
-const dragCurrentX = ref(0)
-const dragCurrentY = ref(0)
-const dragDirection = ref(null)
-const showMatchModal = ref(false)
-const lastMatchedUser = ref(null)
+const currentCardIndex = ref(0);
+const isAnimating = ref(false);
+const showMatchModal = ref(false);
+const lastMatchedUser = ref(null);
+const currentRoomId = ref(null); // Chat-Room für das Match
 
-// Generate fake users based on user's selected artists
-const generateFakeUsers = () => {
-  const userArtists = userStore.me?.topArtists || ['Fred again..', 'Drake', 'Taylor Swift']
-  const userGenres = userStore.me?.genres || ['electropop', 'Pop', 'Hip-Hop']
+const chatsStore = useChatsStore();
 
-  const firstNames = ['Alex', 'Jordan', 'Casey', 'Morgan', 'Riley', 'Jamie', 'Avery', 'Quinn', 'Blake', 'Reese']
-  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez']
+// Karten direkt aus den Matches
+const cards = computed(() =>
+  matchesStore.list.map((m, index) => ({
+    // hier musst du die Felder an dein Backend anpassen:
+    id: m.id ?? m.userId ?? `match-${index}`,
+    userId: m.id ?? m.userId, // wichtig für Like-Endpoint
+    name: m.displayName ?? m.name ?? "Unknown",
+    age: m.age ?? m.user?.age ?? 0,
+    avatar:
+      m.avatar ??
+      m.avatar_url ??
+      m.avatarUrl ??
+      `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
+    bio: m.bio ?? "Music lover 🎵",
+    distance:
+      m.distance ??
+      (m.distanceKm != null ? `${m.distanceKm} km away` : "Nearby"),
+    topArtists: m.topArtists ?? m.spotifyTopArtists ?? [],
+    genres: m.genres ?? m.spotifyGenres ?? [],
+    matchScore: m.matchScore ?? m.compatibility ?? 90,
+  }))
+);
 
-  const bios = [
-    'Music is my escape 🎵',
-    'Concert enthusiast | Always looking for the next show',
-    'Living for the drop 🎧',
-    'Vinyl collector & festival goer',
-    'Let\'s vibe to the same rhythm',
-    'Dancing through life one beat at a time',
-    'Music brings us together ✨',
-    'Looking for my concert buddy',
-    'Good music, good vibes only',
-    'Life\'s a playlist, let\'s make it together'
-  ]
+const visibleCards = computed(() =>
+  cards.value.slice(currentCardIndex.value, currentCardIndex.value + 3)
+);
 
-  // Similar artists to expand the pool
-  const similarArtists = {
-    'Fred again..': ['Skrillex', 'Four Tet', 'Jamie xx', 'Bicep'],
-    'Taylor Swift': ['Olivia Rodrigo', 'Sabrina Carpenter', 'Gracie Abrams', 'Conan Gray'],
-    'Drake': ['The Weeknd', 'Travis Scott', 'Post Malone', 'Future'],
-    'The Weeknd': ['Drake', 'Travis Scott', 'Frank Ocean', 'Party NextDoor'],
-    'Bad Bunny': ['J Balvin', 'Karol G', 'Rauw Alejandro', 'Ozuna'],
-    'SZA': ['Summer Walker', 'Jhené Aiko', 'Kehlani', 'H.E.R.'],
-    'Travis Scott': ['Drake', 'The Weeknd', 'Don Toliver', 'Playboi Carti'],
-    'Olivia Rodrigo': ['Taylor Swift', 'Conan Gray', 'Sabrina Carpenter', 'Gracie Abrams'],
-    'Harry Styles': ['Niall Horan', 'Louis Tomlinson', 'Shawn Mendes', 'Charlie Puth'],
-    'Doja Cat': ['Megan Thee Stallion', 'Saweetie', 'Cardi B', 'Nicki Minaj'],
-    'Post Malone': ['Drake', 'Travis Scott', 'Juice WRLD', 'Lil Uzi Vert'],
-    'Billie Eilish': ['Lorde', 'Lana Del Rey', 'Halsey', 'Melanie Martinez'],
-    'Ariana Grande': ['Doja Cat', 'Miley Cyrus', 'Selena Gomez', 'Madison Beer'],
-    'Ed Sheeran': ['Lewis Capaldi', 'James Arthur', 'Shawn Mendes', 'Charlie Puth'],
-    'Dua Lipa': ['The Weeknd', 'Calvin Harris', 'Dua Lipa', 'Bebe Rexha'],
-    'Kendrick Lamar': ['J. Cole', 'Drake', 'Tyler, the Creator', 'Kanye West'],
-    'Beyoncé': ['Rihanna', 'Nicki Minaj', 'Alicia Keys', 'Solange']
-  }
-
-  const allAvailableArtists = [...userArtists]
-  userArtists.forEach(artist => {
-    if (similarArtists[artist]) {
-      allAvailableArtists.push(...similarArtists[artist])
-    }
-  })
-
-  const users = []
-  for (let i = 0; i < 20; i++) {
-    const firstName = firstNames[Math.floor(Math.random() * firstNames.length)]
-    const lastName = lastNames[Math.floor(Math.random() * lastNames.length)]
-    const sharedArtistsCount = Math.floor(Math.random() * 3) + 1
-    const sharedArtists = []
-
-    // Always include at least one user's picked artist
-    const userPickedArtist = userArtists[Math.floor(Math.random() * userArtists.length)]
-    sharedArtists.push(userPickedArtist)
-
-    // Add similar artists
-    while (sharedArtists.length < sharedArtistsCount) {
-      const randomArtist = allAvailableArtists[Math.floor(Math.random() * allAvailableArtists.length)]
-      if (!sharedArtists.includes(randomArtist)) {
-        sharedArtists.push(randomArtist)
-      }
-    }
-
-    // Add some unique artists
-    const otherArtists = ['Tame Impala', 'Arctic Monkeys', 'The 1975', 'Flume', 'ODESZA']
-    const topArtists = [...sharedArtists]
-    while (topArtists.length < 5) {
-      const randomArtist = otherArtists[Math.floor(Math.random() * otherArtists.length)]
-      if (!topArtists.includes(randomArtist)) {
-        topArtists.push(randomArtist)
-      }
-    }
-
-    // Shared genres
-    const sharedGenres = userGenres.slice(0, Math.floor(Math.random() * 2) + 1)
-    const otherGenres = ['Indie', 'Alternative', 'Electronic', 'R&B', 'Jazz']
-    const genres = [...sharedGenres]
-    while (genres.length < 4) {
-      const randomGenre = otherGenres[Math.floor(Math.random() * otherGenres.length)]
-      if (!genres.includes(randomGenre)) {
-        genres.push(randomGenre)
-      }
-    }
-
-    const matchScore = Math.floor(60 + (sharedArtists.length / topArtists.length) * 40)
-
-    users.push({
-      id: `user-${i}`,
-      name: `${firstName} ${lastName}`,
-      age: Math.floor(Math.random() * 13) + 21, // 21-33
-      avatar: `https://i.pravatar.cc/400?img=${(i + 10) % 70}`,
-      bio: bios[Math.floor(Math.random() * bios.length)],
-      distance: `${Math.floor(Math.random() * 20) + 1} km away`,
-      topArtists: topArtists,
-      genres: genres,
-      matchScore: matchScore,
-      sharedArtists: sharedArtists
-    })
-  }
-
-  return users
-}
-
-const cards = ref([])
-
-const visibleCards = computed(() => {
-  return cards.value.slice(currentCardIndex.value, currentCardIndex.value + 3)
-})
-
-const getCardStyle = (index) => {
-  return {}
-}
+const getCardStyle = () => ({});
 
 const swipeLeft = () => {
-  if (isAnimating.value) return
-  isAnimating.value = true
+  if (isAnimating.value) return;
+  isAnimating.value = true;
 
   $q.notify({
-    message: 'Passed',
-    color: 'red-5',
-    icon: 'close',
-    position: 'top',
-    timeout: 1000
-  })
+    message: "Passed",
+    color: "red-5",
+    icon: "close",
+    position: "top",
+    timeout: 800,
+  });
 
   setTimeout(() => {
-    currentCardIndex.value++
-    isAnimating.value = false
-  }, 300)
-}
+    currentCardIndex.value++;
+    isAnimating.value = false;
+  }, 250);
+};
 
-const swipeRight = () => {
-  if (isAnimating.value) return
-  isAnimating.value = true
+const swipeRight = async () => {
+  if (isAnimating.value) return;
+  isAnimating.value = true;
 
-  const currentCard = cards.value[currentCardIndex.value]
-
-  // 60% chance of match
-  const isMatch = Math.random() > 0.4
-
-  if (isMatch) {
-    lastMatchedUser.value = currentCard
-    showMatchModal.value = true
-  } else {
-    $q.notify({
-      message: 'Liked!',
-      color: 'green-5',
-      icon: 'favorite',
-      position: 'top',
-      timeout: 1000
-    })
+  const currentCard = cards.value[currentCardIndex.value];
+  if (!currentCard || !currentCard.userId) {
+    currentCardIndex.value++;
+    isAnimating.value = false;
+    return;
   }
 
-  setTimeout(() => {
-    currentCardIndex.value++
-    isAnimating.value = false
-  }, 300)
-}
+  try {
+    // 👉 Like ans Backend schicken
+    const result = await matchesStore.like(currentCard.userId);
+
+    // Erwartetes Response-Format vom Backend:
+    // { isMatch: boolean, roomId?: string }
+    const isMatch = !!result?.isMatch;
+
+    if (isMatch && result.roomId) {
+      lastMatchedUser.value = currentCard;
+      currentRoomId.value = result.roomId;
+
+      // 🟣 NEU: Chat-Liste aktualisieren
+      await chatsStore.fetchChats();
+
+      showMatchModal.value = true;
+    } else {
+      $q.notify({
+        message: "Liked!",
+        color: "green-5",
+        icon: "favorite",
+        position: "top",
+        timeout: 800,
+      });
+    }
+  } catch (err) {
+    console.error("Like failed", err);
+    $q.notify({
+      message: "Like failed",
+      color: "red-5",
+      icon: "error",
+      position: "top",
+      timeout: 1500,
+    });
+  } finally {
+    currentCardIndex.value++;
+    isAnimating.value = false;
+  }
+};
 
 const closeMatchModal = () => {
-  showMatchModal.value = false
-  lastMatchedUser.value = null
-}
+  showMatchModal.value = false;
+  lastMatchedUser.value = null;
+  currentRoomId.value = null;
+};
 
 const sendMessage = () => {
-  showMatchModal.value = false
-  $q.notify({
-    message: 'Feature coming soon!',
-    color: 'purple-5',
-    icon: 'chat',
-    position: 'top'
-  })
-}
+  showMatchModal.value = false;
+  if (!currentRoomId.value) return;
 
-onMounted(() => {
-  cards.value = generateFakeUsers()
-})
+  router.push({
+    name: "ChatView",
+    params: { roomId: currentRoomId.value },
+  });
+};
+
+onMounted(async () => {
+  if (!userStore.me) {
+    await userStore.fetchMe();
+  }
+  await matchesStore.fetchMatches();
+});
 </script>
 
 <style scoped lang="scss">
@@ -398,7 +390,6 @@ onMounted(() => {
 }
 
 @keyframes floatOrb {
-
   0%,
   100% {
     transform: translate(0, 0) scale(1);
@@ -509,7 +500,12 @@ onMounted(() => {
   left: 0;
   right: 0;
   height: 40%;
-  background: linear-gradient(to top, rgba(20, 20, 30, 1) 0%, rgba(20, 20, 30, 0.6) 50%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    rgba(20, 20, 30, 1) 0%,
+    rgba(20, 20, 30, 0.6) 50%,
+    transparent 100%
+  );
 }
 
 .match-badge {
@@ -767,4 +763,4 @@ onMounted(() => {
     height: 100px;
   }
 }
-</style>«
+</style>

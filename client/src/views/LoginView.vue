@@ -7,33 +7,65 @@
         <div class="left-side">
           <div class="form-container">
             <h1 class="form-title">Create an account</h1>
-            <p class="form-subtitle">Enter your details below to create your account</p>
+            <p class="form-subtitle">
+              Enter your details below to create your account
+            </p>
 
             <q-form @submit="handleSignup" class="signup-form">
               <div class="name-row">
                 <div class="form-field">
                   <label class="field-label">First Name</label>
-                  <q-input v-model="formData.firstName" outlined dense class="custom-input"
-                    :rules="[val => !!val || 'Required']" />
+                  <q-input
+                    v-model="formData.firstName"
+                    outlined
+                    dense
+                    class="custom-input"
+                    :rules="[(val) => !!val || 'Required']"
+                  />
                 </div>
 
                 <div class="form-field">
                   <label class="field-label">Last Name</label>
-                  <q-input v-model="formData.lastName" outlined dense class="custom-input"
-                    :rules="[val => !!val || 'Required']" />
+                  <q-input
+                    v-model="formData.lastName"
+                    outlined
+                    dense
+                    class="custom-input"
+                    :rules="[(val) => !!val || 'Required']"
+                  />
                 </div>
               </div>
 
               <div class="form-field">
                 <label class="field-label">Birthday</label>
-                <q-input v-model="formData.birthday" outlined dense type="date" class="custom-input"
-                  :rules="[val => !!val || 'Required']" />
+                <q-input
+                  v-model="formData.birthday"
+                  outlined
+                  dense
+                  type="date"
+                  class="custom-input"
+                  :rules="[(val) => !!val || 'Required']"
+                />
               </div>
 
-              <q-btn type="submit" unelevated class="signup-btn" label="Sign up" no-caps />
+              <q-btn
+                type="submit"
+                unelevated
+                class="signup-btn"
+                label="Sign up"
+                no-caps
+              />
+              <q-btn
+                outline
+                color="green-5"
+                class="q-mt-lg"
+                label="Login with Spotify"
+                @click="auth.login"
+              />
 
               <p class="terms-text">
-                By clicking continue, you agree to our Terms of Service and Privacy Policy
+                By clicking continue, you agree to our Terms of Service and
+                Privacy Policy
               </p>
             </q-form>
           </div>
@@ -42,12 +74,28 @@
         <!-- Right Side - Brand -->
         <div class="right-side">
           <div class="brand-content">
-            <img src="../assets/venyuUpscaled.png" alt="Venyu" class="brand-logo" />
+            <img
+              src="../assets/venyuUpscaled.png"
+              alt="Venyu"
+              class="brand-logo"
+            />
 
             <div class="user-avatars">
-              <img src="https://i.pravatar.cc/150?img=33" alt="User" class="avatar" />
-              <img src="https://i.pravatar.cc/150?img=45" alt="User" class="avatar" />
-              <img src="https://i.pravatar.cc/150?img=68" alt="User" class="avatar" />
+              <img
+                src="https://i.pravatar.cc/150?img=33"
+                alt="User"
+                class="avatar"
+              />
+              <img
+                src="https://i.pravatar.cc/150?img=45"
+                alt="User"
+                class="avatar"
+              />
+              <img
+                src="https://i.pravatar.cc/150?img=68"
+                alt="User"
+                class="avatar"
+              />
               <div class="avatar-count">+100</div>
             </div>
 
@@ -55,8 +103,9 @@
 
             <div class="testimonial">
               <p class="testimonial-text">
-                "Venyu connects your music taste with real people — discover events, find your vibe, and meet those who
-                move to the same rhythm."
+                "Venyu connects your music taste with real people — discover
+                events, find your vibe, and meet those who move to the same
+                rhythm."
               </p>
               <p class="testimonial-author">Pitchfork</p>
             </div>
@@ -65,12 +114,17 @@
       </div>
 
       <!-- Preferences Step -->
-      <div v-else-if="step === 'preferences'" key="preferences" class="preferences-container">
+      <div
+        v-else-if="step === 'preferences'"
+        key="preferences"
+        class="preferences-container"
+      >
         <div class="preferences-content">
           <div class="preferences-header">
             <h1 class="preferences-title">Complete Your Profile</h1>
             <p class="preferences-subtitle">
-              Help us personalize your experience by selecting your favorite genres and artists
+              Help us personalize your experience by selecting your favorite
+              genres and artists
             </p>
           </div>
 
@@ -82,9 +136,16 @@
             </div>
 
             <div class="chips-container">
-              <q-chip v-for="genre in genres" :key="genre" :selected="selectedGenres.includes(genre)"
-                @click="toggleGenre(genre)" clickable :color="selectedGenres.includes(genre) ? 'purple-5' : 'grey-8'"
-                text-color="white" class="genre-chip">
+              <q-chip
+                v-for="genre in genres"
+                :key="genre"
+                :selected="selectedGenres.includes(genre)"
+                @click="toggleGenre(genre)"
+                clickable
+                :color="selectedGenres.includes(genre) ? 'purple-5' : 'grey-8'"
+                text-color="white"
+                class="genre-chip"
+              >
                 {{ genre }}
               </q-chip>
             </div>
@@ -98,19 +159,43 @@
             </div>
 
             <div class="chips-container">
-              <q-chip v-for="artist in artists" :key="artist" :selected="selectedArtists.includes(artist)"
-                @click="toggleArtist(artist)" clickable :color="selectedArtists.includes(artist) ? 'pink-5' : 'grey-8'"
-                text-color="white" class="artist-chip">
+              <q-chip
+                v-for="artist in artists"
+                :key="artist"
+                :selected="selectedArtists.includes(artist)"
+                @click="toggleArtist(artist)"
+                clickable
+                :color="selectedArtists.includes(artist) ? 'pink-5' : 'grey-8'"
+                text-color="white"
+                class="artist-chip"
+              >
                 {{ artist }}
               </q-chip>
             </div>
           </div>
 
           <div class="preferences-actions">
-            <q-btn outline color="grey-6" label="Skip for now" @click="completeSetup" no-caps class="skip-btn" />
-            <q-btn unelevated color="purple-5"
-              :label="`Continue (${selectedGenres.length + selectedArtists.length} selected)`" @click="completeSetup"
-              no-caps class="continue-btn" :disable="selectedGenres.length === 0 && selectedArtists.length === 0" />
+            <q-btn
+              outline
+              color="grey-6"
+              label="Skip for now"
+              @click="completeSetup"
+              no-caps
+              class="skip-btn"
+            />
+            <q-btn
+              unelevated
+              color="purple-5"
+              :label="`Continue (${
+                selectedGenres.length + selectedArtists.length
+              } selected)`"
+              @click="completeSetup"
+              no-caps
+              class="continue-btn"
+              :disable="
+                selectedGenres.length === 0 && selectedArtists.length === 0
+              "
+            />
           </div>
         </div>
 
@@ -126,91 +211,117 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useQuasar } from 'quasar'
-import { useUserStore } from '@/stores/user'
+import { ref } from "vue";
+import { useAuthStore } from "@/stores/auth";
 
-const router = useRouter()
-const $q = useQuasar()
-const userStore = useUserStore()
+const auth = useAuthStore();
 
-const step = ref('login')
+const step = ref("login");
 const formData = ref({
-  firstName: '',
-  lastName: '',
-  birthday: ''
-})
+  firstName: "",
+  lastName: "",
+  birthday: "",
+});
 
 const genres = [
-  'Pop', 'Rock', 'Hip-Hop', 'R&B', 'Electronic', 'Indie',
-  'Jazz', 'Country', 'Classical', 'Metal', 'Alternative', 'Soul',
-  'Reggae', 'Blues', 'Folk', 'Punk'
-]
+  "Pop",
+  "Rock",
+  "Hip-Hop",
+  "R&B",
+  "Electronic",
+  "Indie",
+  "Jazz",
+  "Country",
+  "Classical",
+  "Metal",
+  "Alternative",
+  "Soul",
+  "Reggae",
+  "Blues",
+  "Folk",
+  "Punk",
+];
 
 const artists = [
-  'Taylor Swift', 'Drake', 'The Weeknd', 'Bad Bunny', 'SZA', 'Travis Scott',
-  'Olivia Rodrigo', 'Harry Styles', 'Doja Cat', 'Post Malone', 'Billie Eilish',
-  'Ariana Grande', 'Ed Sheeran', 'Dua Lipa', 'Kendrick Lamar', 'Beyoncé'
-]
+  "Taylor Swift",
+  "Drake",
+  "The Weeknd",
+  "Bad Bunny",
+  "SZA",
+  "Travis Scott",
+  "Olivia Rodrigo",
+  "Harry Styles",
+  "Doja Cat",
+  "Post Malone",
+  "Billie Eilish",
+  "Ariana Grande",
+  "Ed Sheeran",
+  "Dua Lipa",
+  "Kendrick Lamar",
+  "Beyoncé",
+];
 
-const selectedGenres = ref([])
-const selectedArtists = ref([])
+const selectedGenres = ref([]);
+const selectedArtists = ref([]);
 
 const handleSignup = () => {
   // Animate to next step
-  step.value = 'preferences'
-}
+  step.value = "preferences";
+};
 
 const toggleGenre = (genre) => {
-  const index = selectedGenres.value.indexOf(genre)
+  const index = selectedGenres.value.indexOf(genre);
   if (index > -1) {
-    selectedGenres.value.splice(index, 1)
+    selectedGenres.value.splice(index, 1);
   } else {
-    selectedGenres.value.push(genre)
+    selectedGenres.value.push(genre);
   }
-}
+};
 
 const toggleArtist = (artist) => {
-  const index = selectedArtists.value.indexOf(artist)
+  const index = selectedArtists.value.indexOf(artist);
   if (index > -1) {
-    selectedArtists.value.splice(index, 1)
+    selectedArtists.value.splice(index, 1);
   } else {
-    selectedArtists.value.push(artist)
+    selectedArtists.value.push(artist);
   }
-}
+};
 
 const completeSetup = () => {
   // Create complete user profile
   const userData = {
-    id: 'demo-user',
+    id: "demo-user",
     name: `${formData.value.firstName} ${formData.value.lastName}`,
     firstName: formData.value.firstName,
     lastName: formData.value.lastName,
     birthday: formData.value.birthday,
-    topArtists: selectedArtists.value.length > 0 ? selectedArtists.value : ['Fred again..'],
-    genres: selectedGenres.value.length > 0 ? selectedGenres.value : ['electropop'],
-    createdAt: new Date().toISOString()
-  }
+    topArtists:
+      selectedArtists.value.length > 0
+        ? selectedArtists.value
+        : ["Fred again.."],
+    genres:
+      selectedGenres.value.length > 0 ? selectedGenres.value : ["electropop"],
+    createdAt: new Date().toISOString(),
+  };
 
   // Save to localStorage
-  localStorage.setItem('venyu_demo_user', JSON.stringify(userData))
+  localStorage.setItem("venyu_demo_user", JSON.stringify(userData));
 
   // Update the user store
-  userStore.setUser(userData)
+  userStore.setUser(userData);
 
   $q.notify({
-    type: 'positive',
-    message: 'Profile created successfully!',
-    position: 'top',
-    timeout: 2000
-  })
+    type: "positive",
+    message: "Profile created successfully!",
+    position: "top",
+    timeout: 2000,
+  });
 
   // Navigate to main app
   setTimeout(() => {
-    router.push({ name: 'Home' })
-  }, 500)
-}
+    router.push({ name: "Home" });
+  }, 500);
+};
 </script>
 
 <style scoped lang="scss">
@@ -346,12 +457,19 @@ const completeSetup = () => {
   overflow: hidden;
 
   &::before {
-    content: '';
+    content: "";
     position: absolute;
     inset: 0;
-    background:
-      radial-gradient(circle at 20% 30%, rgba(147, 51, 234, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 70%, rgba(236, 72, 153, 0.15) 0%, transparent 50%);
+    background: radial-gradient(
+        circle at 20% 30%,
+        rgba(147, 51, 234, 0.15) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 80% 70%,
+        rgba(236, 72, 153, 0.15) 0%,
+        transparent 50%
+      );
   }
 }
 
@@ -415,7 +533,7 @@ const completeSetup = () => {
   font-weight: 600;
   color: white;
   margin-bottom: 3rem;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   letter-spacing: -0.5px;
 }
 
@@ -623,7 +741,6 @@ const completeSetup = () => {
 }
 
 @keyframes floatShape {
-
   0%,
   100% {
     transform: translate(0, 0) rotate(0deg);
@@ -650,7 +767,6 @@ const completeSetup = () => {
 }
 
 @media (max-width: 640px) {
-
   .left-side,
   .preferences-content {
     padding: 2rem 1.5rem;

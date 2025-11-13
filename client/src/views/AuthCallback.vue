@@ -13,4 +13,8 @@ onMounted(async () => {
   const dest = auth.popIntended() || '/profile';
   router.replace(dest);
 });
+
+
+
 </script>
+

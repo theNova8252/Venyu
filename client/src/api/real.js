@@ -1,14 +1,53 @@
+// src/api/real.js
+const baseFetch = async (url, options = {}) => {
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+    ...options,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+
+  return res.json();
+};
+
 export const realAPI = {
+  // User-Profil (für deinen UserStore / SwipeCard)
   async getMe() {
-    throw new Error('realAPI not wired yet');
+    // Annahme: /api/user/me gibt dein erweitertes Profil mit topArtists, genres etc.
+    return baseFetch('/api/user/me');
   },
+
+  // Matches – aktuell keine echte Route => stabil: leeres Array
   async getMatches() {
-    throw new Error('realAPI not wired yet');
+    return [];
   },
+
+  // Events – aktuell keine echte Route => stabil: leeres Array
   async getEventsNearby() {
-    throw new Error('realAPI not wired yet');
+    return [];
   },
-  async likeMatch() {
-    throw new Error('realAPI not wired yet');
+
+  // Like – vorerst no-op (kein Fehler)
+  async likeMatch(/* id */) {
+    return;
+  },
+
+  // 💬 Chat
+  async getChatMessages(roomId) {
+    return baseFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`);
+  },
+
+  async sendChatMessage(roomId, text, senderId) {
+    return baseFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text, senderId }),
+    });
   },
 };
