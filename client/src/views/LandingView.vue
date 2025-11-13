@@ -356,14 +356,14 @@ async function startDemo() {
     $q.loading?.hide()
   }
 }
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:8888'
+const API = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:5000'
 const onSpotifyConnect = () => {
   if (IS_DEMO) {
     $q.notify({ type: 'info', message: 'Demo mode is active — use “Start Demo” to explore without Spotify.' })
     return
   }
-  const state = btoa(JSON.stringify({ returnTo: window.location.href }))
-  window.location.href = `${API}/spotify/auth/login?state=${encodeURIComponent(state)}`
+  const state = btoa(JSON.stringify({ returnTo: `${location.origin}/profile` }))
+  window.location.href = `${API}/api/spotify/auth/login?state=${encodeURIComponent(state)}`
 }
 const stats = ref([
   { label: 'Active Users', value: 50000 },

@@ -21,58 +21,67 @@ export const login = (req, res) => {
   return res.redirect(buildAuthUrl(state));
 };
 
-export const callback = async (req, res, next) => {
+export const callback = async (req, res) => {
   try {
-    const { code, error } = req.query;
-    if (error) return res.status(400).json({ error });
-    if (!code) return res.status(400).json({ error: 'missing_code' });
+    const { code, state } = req.query;
+    if (!code) return res.status(400).send('Missing code');
 
     const tokens = await exchangeCodeForTokens(code);
+    const me = await fetchMe(tokens.access_token); // Spotify /me
+
+    // insert or update user
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    const me = await fetchMe(tokens.access_token);
-    const avatar = me.images?.[0]?.url || null;
+    let user = await User.findOne({ where: { spotifyId: me.id } });
+    if (user) {
+      await user.update({
+        displayName: me.display_name ?? null,
+        email: me.email ?? null,
+        avatarUrl: me.images?.[0]?.url ?? null,
+        country: me.country ?? null,
+        product: me.product ?? null,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? user.refreshToken,
+        tokenExpiresAt: expiresAt,
+      });
+    } else {
+      user = await User.create({
+        spotifyId: me.id,
+        displayName: me.display_name ?? null,
+        email: me.email ?? null,
+        avatarUrl: me.images?.[0]?.url ?? null,
+        country: me.country ?? null,
+        product: me.product ?? null,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token ?? null,
+        tokenExpiresAt: expiresAt,
+      });
+    }
 
-    const [user, created] = await User.upsert(
-      {
-        spotify_id: me.id,
-        display_name: me.display_name || null,
-        email: me.email || null,
-        avatar_url: avatar,
-        country: me.country || null,
-        product: me.product || null,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token ?? null,
-        token_expires_at: expiresAt,
-      },
-      { returning: true, conflictFields: ['spotify_id'] },
-    );
-
+    res.cookie('at', tokens.access_token, {
+      ...COOKIE_OPTS_BASE,
+      maxAge: tokens.expires_in * 1000,
+    });
     if (tokens.refresh_token) {
       res.cookie('rt', tokens.refresh_token, {
         ...COOKIE_OPTS_BASE,
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
     }
-    res.cookie('at', tokens.access_token, {
-      ...COOKIE_OPTS_BASE,
-      maxAge: tokens.expires_in * 1000,
-    });
 
-    return res.status(200).json({
-      message: created ? 'user_created' : 'user_updated',
-      user: {
-        id: user.id,
-        spotify_id: user.spotify_id,
-        display_name: user.display_name,
-        email: user.email,
-        avatar_url: user.avatar_url,
-        product: user.product,
-        country: user.country,
-      },
-    });
-  } catch (err) {
-    return next(err);
+    // redirect back to app
+    const ret = (() => {
+      try {
+        return JSON.parse(Buffer.from(state || '', 'base64').toString())?.returnTo;
+      } catch {
+        return null;
+      }
+    })();
+    const to = ret || process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
+    return res.redirect(to);
+  } catch (e) {
+    console.error('Callback error:', e); // <-- log full error
+    return res.status(500).send(e?.message || 'Error');
   }
 };
 

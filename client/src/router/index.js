@@ -7,6 +7,8 @@ import LandingView from '../views/LandingView.vue';
 import OnboardingPage from '@/views/OnboardingPage.vue';
 import DemoLogin from '../views/DemoLogin.vue';
 import SwipeCard from '../views/SwipeCard.vue';
+import ProfileView from '@/views/ProfileView.vue';
+import AuthCallback from '@/views/AuthCallback.vue';
 import { useAuthStore } from '@/stores/auth.js';
 
 const router = createRouter({
@@ -29,12 +31,24 @@ const router = createRouter({
       component: SwipeCard,
       name: 'SwipeCard',
     },
+    {
+      path: '/profile',
+      component: ProfileView,
+      name: 'ProfileView',
+      meta: { requiresAuth: true },
+    }
   ],
 });
 
-router.beforeEach(() => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
-  if (!auth.tokens) auth.boot();
+  if (!auth.ready) await auth.fetchMe();
+
+  if (to.meta.requiresAuth && !auth.user) {
+    auth.setIntended(to.fullPath);
+    return { path: '/' }; 
+  }
+  return true;
 });
 
 router.beforeResolve((to) => {
@@ -42,6 +56,11 @@ router.beforeResolve((to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
+});
+
+router.addRoute({
+  path: '/auth/callback',
+  component: AuthCallback
 });
 
 export default router;
