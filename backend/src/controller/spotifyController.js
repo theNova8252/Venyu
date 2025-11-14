@@ -42,7 +42,6 @@ export const callback = async (req, res) => {
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    // 🔎 Normalize artists
     const topArtists = topArtistsRes.items.map((a) => ({
       id: a.id,
       name: a.name,
@@ -52,7 +51,6 @@ export const callback = async (req, res) => {
       uri: a.uri,
     }));
 
-    // 🔎 Normalize tracks
     const topTracks = topTracksRes.items.map((t) => ({
       id: t.id,
       name: t.name,
@@ -73,12 +71,10 @@ export const callback = async (req, res) => {
         })) ?? [],
     }));
 
-    // 🎧 Derive a flat set of genres from top artists
     const genresSet = new Set();
     topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
     const genres = Array.from(genresSet);
 
-    // Upsert user by spotifyId (JS: spotifyId, NOT spotify_id)
     let user = await User.findOne({ where: { spotifyId: me.id } });
 
     const userPayload = {
@@ -134,7 +130,6 @@ export const callback = async (req, res) => {
   }
 };
 
-// ======================= ME ==========================
 export const me = async (req, res, next) => {
   try {
     const { at } = req.cookies || {};
@@ -159,7 +154,6 @@ export const me = async (req, res, next) => {
     return next(e);
   }
 };
-// ======================= REFRESH =====================
 export const refresh = async (req, res, next) => {
   try {
     const cookieRt = (req.cookies && req.cookies.rt) || null;
