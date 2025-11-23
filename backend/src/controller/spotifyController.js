@@ -14,8 +14,8 @@ dotenv.config();
 
 const COOKIE_OPTS_BASE = {
   httpOnly: true,
-  sameSite: 'lax',
-  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'none',
+  secure: true,
   path: '/',
 };
 
@@ -49,6 +49,7 @@ export const callback = async (req, res) => {
       popularity: a.popularity,
       image: a.images?.[0]?.url ?? null,
       uri: a.uri,
+      followers: a.followers,
     }));
 
     const topTracks = topTracksRes.items.map((t) => ({
@@ -135,19 +136,19 @@ export const me = async (req, res, next) => {
     const { at } = req.cookies || {};
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
-    const profile = await fetchMe(at); // Spotify-Profil
+    const profile = await fetchMe(at);
     const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
     return res.json({
       id: user.id,
-      display_name: user.displayName,
+      displayName: user.displayName,
       email: user.email,
-      avatar_url: user.avatarUrl,
+      avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
-      top_artists: user.topArtists,
-      top_tracks: user.topTracks,
+      topArtists: user.topArtists,
+      topTracks: user.topTracks,
       genres: user.genres,
     });
   } catch (e) {

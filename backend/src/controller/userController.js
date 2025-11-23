@@ -22,22 +22,30 @@ export const getMeProfile = async (req, res, next) => {
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
     const sp = await fetchMe(at);
+    const spImage = sp.images?.[0]?.url ?? null;
     const user = await User.findOne({ where: { spotifyId: sp.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
     return res.json({
       id: user.id,
-      display_name: user.displayName,
+      displayName: user.displayName,
       email: user.email,
-      avatar_url: user.avatarUrl,
+      avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
       bio: user.bio,
-      is_visible: user.isVisible,
+      isVisible: user.isVisible,
+
       genres: user.genres,
-      top_artists: user.topArtists,
-      top_tracks: user.topTracks,
-      spotify: { id: sp.id, display_name: sp.display_name, followers: sp.followers?.total ?? 0 },
+      topArtists: user.topArtists,
+      topTracks: user.topTracks,
+
+      spotify: {
+        id: sp.id,
+        displayName: sp.display_name,
+        followers: sp.followers?.total ?? 0,
+        image: spImage,
+      },
     });
   } catch (e) {
     return next(e);

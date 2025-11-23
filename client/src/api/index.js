@@ -1,6 +1,13 @@
 // client/src/api/index.js
 
 export const api = {
+  async getEventsNearby(lat, lng) {
+    const res = await fetch(`/api/events/nearby?lat=${lat}&lng=${lng}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch events');
+    return await res.json();
+  },
   async getMatches() {
     const res = await fetch('/api/matches/candidates', {
       credentials: 'include',

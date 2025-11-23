@@ -13,6 +13,7 @@ import spotifyRoutes from './api/routes/spotifyRoutes.js';
 import userRoutes from './api/routes/userRoutes.js';
 import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import eventRoutes from './api/routes/eventRoutes.js';
 
 // Modelle
 import User from './model/User.js';
@@ -69,6 +70,7 @@ function makeRoomId(a, b) {
 app.use('/api/spotify', spotifyRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/events', eventRoutes);
 
 // === Matches: Kandidaten für Discover ===
 app.get('/api/matches/candidates', async (req, res, next) => {
@@ -193,10 +195,8 @@ app.get('/api/chat/rooms', async (req, res, next) => {
   }
 });
 
-
 // health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-
 
 // error handling
 app.use(notFoundHandler);
@@ -215,7 +215,6 @@ const PORT = Number(process.env.PORT) || 5000;
     console.error('Failed to init DB:', err);
     process.exit(1);
   }
-
   // === Chat: Liste meiner Matches / Chat-Räume ===
 app.get('/api/chat/rooms', async (req, res, next) => {
   try {
