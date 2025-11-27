@@ -1,6 +1,8 @@
 <template>
   <q-page class="q-pa-md">
-    <div id="map"></div>
+    <div class="map-wrapper">
+      <div id="map"></div>
+    </div>
   </q-page>
 </template>
 
@@ -81,12 +83,16 @@ onMounted(async () => {
   const map = new mapboxgl.Map({
     container: "map",
     style: "mapbox://styles/mapbox/dark-v11",
-    center: [16.3738, 48.2082], // Vienna
-    zoom: 4,
+    center: [16.3738, 48.2082],
+    zoom: 6.5,
+    pitch: 0,
+    bearing: 0,
+    antialias: true
   });
 
   map.on("load", () => {
-    // Group events by coordinates
+    map.resize();
+
     const groups = {};
     events.list.forEach((e) => {
       const lat = Number(e.lat);
@@ -98,26 +104,29 @@ onMounted(async () => {
       groups[key].push(e);
     });
 
-    // Create ONE marker per venue with carousel popup
     Object.entries(groups).forEach(([key, group]) => {
       const [latStr, lngStr] = key.split(",");
       const lat = Number(latStr);
       const lng = Number(lngStr);
 
-      // Create custom marker
       const markerEl = document.createElement("div");
       markerEl.className = "venue-marker";
       markerEl.innerHTML = `
-        <div class="marker-dot"></div>
-        ${group.length > 1 ? `<div class="marker-badge">${group.length}</div>` : ''}
+        <div class="marker-inner">
+          <div class="marker-dot">
+            <div class="marker-center"></div>
+          </div>
+          ${group.length > 1 ? `<div class="marker-badge">${group.length}</div>` : ''}
+        </div>
       `;
 
-      // Create popup with carousel
       const popupEl = buildCarouselPopup(group);
       const popup = new mapboxgl.Popup({
         offset: 25,
-        maxWidth: '300px',
-        className: 'event-popup'
+        maxWidth: '320px',
+        className: 'event-popup',
+        closeButton: true,
+        closeOnClick: false
       }).setDOMContent(popupEl);
 
       new mapboxgl.Marker(markerEl)
@@ -130,52 +139,99 @@ onMounted(async () => {
 </script>
 
 <style>
-#map {
+.map-wrapper {
+  position: relative;
   width: 100%;
   height: calc(100vh - 80px);
+  transform: none !important;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
   border-radius: 16px;
   overflow: hidden;
 }
 
-/* Marker styles */
-.venue-marker {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
+.q-layout,
+.q-page-container,
+.q-page {
+  transform: none !important;
 }
 
-.venue-marker:hover {
-  transform: scale(1.15);
+/* Marker styles - CRITICAL: Simple structure for proper positioning */
+.venue-marker {
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marker-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.venue-marker:hover .marker-inner {
+  transform: scale(1.25);
 }
 
 .marker-dot {
-  width: 20px;
-  height: 20px;
-  background: linear-gradient(135deg, #ec4899, #a855f7);
-  border: 3px solid white;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
+  border: 4px solid white;
   border-radius: 50%;
-  box-shadow: 0 2px 12px rgba(236, 72, 153, 0.6);
+  box-shadow:
+    0 4px 20px rgba(236, 72, 153, 0.6),
+    0 0 0 4px rgba(236, 72, 153, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.venue-marker:hover .marker-dot {
+  box-shadow:
+    0 6px 30px rgba(236, 72, 153, 0.8),
+    0 0 0 8px rgba(236, 72, 153, 0.15);
+}
+
+.marker-center {
+  width: 10px;
+  height: 10px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.9;
 }
 
 .marker-badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #8b5cf6;
+  top: -6px;
+  right: -6px;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
   color: white;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
-  padding: 2px 6px;
+  padding: 4px 7px;
   border-radius: 999px;
-  border: 2px solid white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  min-width: 18px;
+  border: 3px solid white;
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.6);
+  min-width: 22px;
   text-align: center;
+  line-height: 1;
+  z-index: 10;
 }
 
-/* Popup carousel */
+/* Popup styles */
 .popup-carousel {
   min-width: 240px;
   color: #1a1a1a;
@@ -232,7 +288,6 @@ onMounted(async () => {
   box-shadow: 0 4px 12px rgba(236, 72, 153, 0.5);
 }
 
-/* Navigation controls */
 .popup-nav {
   display: flex;
   align-items: center;
@@ -276,28 +331,49 @@ onMounted(async () => {
   text-align: center;
 }
 
-/* Override Mapbox popup styles */
 :global(.mapbox-gl-popup-content) {
   background: white;
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
 }
 
 :global(.mapbox-gl-popup-tip) {
-  border-top-color: white;
+  border-top-color: white !important;
 }
 
 :global(.mapbox-gl-popup-close-button) {
-  font-size: 20px;
-  padding: 6px 10px;
+  font-size: 22px;
+  padding: 8px 12px;
   color: #999;
-  right: 8px;
-  top: 8px;
+  right: 10px;
+  top: 10px;
+  transition: all 0.2s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
 }
 
 :global(.mapbox-gl-popup-close-button:hover) {
-  background: rgba(0, 0, 0, 0.05);
-  color: #333;
+  background: rgba(236, 72, 153, 0.1);
+  color: #ec4899;
+  transform: scale(1.1);
+}
+
+:global(.mapbox-gl-popup-anchor-bottom .mapbox-gl-popup-tip) {
+  border-top-color: white !important;
+}
+
+:global(.mapbox-gl-popup-anchor-top .mapbox-gl-popup-tip) {
+  border-bottom-color: white !important;
+}
+
+:global(.mapbox-gl-popup-anchor-left .mapbox-gl-popup-tip) {
+  border-right-color: white !important;
+}
+
+:global(.mapbox-gl-popup-anchor-right .mapbox-gl-popup-tip) {
+  border-left-color: white !important;
 }
 </style>
