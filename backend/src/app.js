@@ -13,6 +13,7 @@ import spotifyRoutes from './api/routes/spotifyRoutes.js';
 import userRoutes from './api/routes/userRoutes.js';
 import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import eventRoutes from './api/routes/eventRoutes.js';
 
 import http from 'http';                 
 import { WebSocketServer } from 'ws';    
@@ -74,6 +75,7 @@ function makeRoomId(a, b) {
 app.use('/api/spotify', spotifyRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/events', eventRoutes);
 
 // === Matches: Kandidaten für Discover ===
 app.get('/api/matches/candidates', async (req, res, next) => {
@@ -198,10 +200,8 @@ app.get('/api/chat/rooms', async (req, res, next) => {
   }
 });
 
-
 // health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
-
 
 // error handling
 app.use(notFoundHandler);
@@ -405,6 +405,46 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
     console.error('Failed to init DB:', err);
     process.exit(1);
   }
+  // === Chat: Liste meiner Matches / Chat-Räume ===
+app.get('/api/chat/rooms', async (req, res, next) => {
+  try {
+    const me = await getCurrentUser(req);
+
+    // Likes, die ich gegeben habe
+    const iLiked = await Like.findAll({
+      where: { fromUserId: me.id }
+    });
+
+    // Likes, die ich bekommen habe
+    const likedMe = await Like.findAll({
+      where: { toUserId: me.id }
+    });
+
+    // Finde Matches (beide Richtungen existieren)
+    const matches = iLiked
+      .filter(l1 => likedMe.some(l2 => l2.fromUserId === l1.toUserId))
+      .map(m => m.toUserId);
+
+    // Daten der Match-User holen
+    const users = await User.findAll({
+      where: { id: matches }
+    });
+
+    const result = users.map(u => ({
+      roomId: [u.id, me.id].sort().join("__"),
+      user: {
+        id: u.id,
+        name: u.displayName || "Unknown",
+        avatar: u.avatarUrl || "https://i.pravatar.cc/150?u=" + u.id,
+        bio: u.bio || ""
+      }
+    }));
+
+    return res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
 })();
 
 export default app;

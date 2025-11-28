@@ -169,7 +169,7 @@
                         <div class="column items-end q-gutter-xs">
                           <q-badge v-if="artist.popularity != null" color="deep-purple-4" text-color="white"
                             class="popularity-badge">
-                            {{ artist.popularity }}
+                             {{ artist.popularity }}
                             <q-icon name="trending_up" size="xs" class="q-ml-xs" />
                           </q-badge>
                           <div class="rank-badge">
@@ -182,7 +182,6 @@
                 </div>
               </div>
 
-              <!-- Top Tracks -->
               <div class="col-12 col-md-6" v-if="topTracks.length">
                 <div class="music-section">
                   <div class="section-subtitle q-mb-sm">

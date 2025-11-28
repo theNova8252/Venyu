@@ -13,6 +13,8 @@
   "dependencies": {
     "@quasar/extras": "^1.17.0",
     "axios": "^1.12.2",
+    "leaflet": "^1.9.4",
+    "mapbox-gl": "^3.16.0",
     "msw": "^2.12.0",
     "pinia": "^3.0.3",
     "quasar": "^2.18.2",
