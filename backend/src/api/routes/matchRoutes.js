@@ -48,7 +48,7 @@ router.get('/candidates', async (req, res, next) => {
       name: u.displayName || 'Unknown',
       avatar:
         u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
-      bio: u.bio || 'Music lover 🎵',
+      bio: u.bio || 'Music lover',
       distance: 'Nearby',
       topArtists: [],
       genres: [],

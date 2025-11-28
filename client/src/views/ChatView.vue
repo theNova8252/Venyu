@@ -4,7 +4,12 @@
       <q-btn flat round dense icon="arrow_back" @click="$router.back()" />
       <div class="q-ml-md">
         <div class="text-subtitle1">Chat</div>
-        <div class="text-caption text-grey-6">Room: {{ roomId }}</div>
+        <div
+          class="text-caption"
+          :class="otherIsOnline ? 'text-positive' : 'text-grey-6'"
+        >
+          {{ otherIsOnline ? "Online" : "Offline" }}
+        </div>
       </div>
     </div>
 
@@ -57,14 +62,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref, computed, onUnmounted } from "vue";
+import { onMounted, ref, computed, onUnmounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useChatStore } from "@/stores/chat";
 import { useAuthStore } from "@/stores/auth";
+import { usePresenceStore } from "@/stores/active";
 
 const route = useRoute();
 const chatStore = useChatStore();
 const authStore = useAuthStore();
+const presenceStore = usePresenceStore();
 
 const roomId = computed(() => route.params.roomId);
 const messages = computed(() => chatStore.messages(roomId.value));
@@ -72,19 +79,96 @@ const loading = computed(() => chatStore.loading);
 const draft = ref("");
 const sending = ref(false);
 
-let pollTimer = null;
+let socket = null;
+
+// --- Online-Status des anderen Nutzers ---
+const currentUserId = computed(() => authStore.user?.id ?? null);
+
+const otherUserId = computed(() => {
+  const r = roomId.value;
+  if (!r) return null;
+
+  const parts = String(r).split("__");
+  const me = currentUserId.value ? String(currentUserId.value) : null;
+
+  if (me) {
+    const other = parts.find((p) => p !== me);
+    return other || parts[0] || null;
+  }
+  return parts[0] || null;
+});
+
+const otherIsOnline = computed(() =>
+  otherUserId.value ? presenceStore.isOnline(otherUserId.value) : false
+);
+
+// --- Chat Nachrichten laden / WebSocket ---
 
 async function fetchMessages() {
   await chatStore.fetchMessages(roomId.value);
 }
 
+function connectWebSocket() {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close();
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+  let host;
+  if (import.meta.env.DEV) {
+    host = "127.0.0.1:5000";
+  } else {
+    host = window.location.host;
+  }
+
+  const wsUrl = `${protocol}://${host}/ws/chat?roomId=${encodeURIComponent(
+    roomId.value
+  )}`;
+
+  console.log("Connecting WS:", wsUrl);
+  socket = new WebSocket(wsUrl);
+
+  socket.onopen = () => {
+    console.log("WS connected");
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === "chat_message") {
+        const msg = data.message;
+        chatStore.addMessage(roomId.value, msg);
+      }
+    } catch (e) {
+      console.error("WS message parse error", e);
+    }
+  };
+
+  socket.onclose = (ev) => {
+    console.log("WS closed", ev.code, ev.reason);
+  };
+
+  socket.onerror = (err) => {
+    console.error("WS error", err);
+  };
+}
+
 onMounted(async () => {
+  presenceStore.connect();   // Presence-Verbindung aufbauen
+  await fetchMessages();     // Verlauf per HTTP
+  connectWebSocket();        // Realtime
+});
+
+watch(roomId, async () => {
   await fetchMessages();
-  pollTimer = setInterval(fetchMessages, 2000);
+  connectWebSocket();
 });
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer);
+  if (socket) {
+    socket.close();
+  }
 });
 
 function formatTime(ts) {
@@ -99,18 +183,23 @@ async function onSend() {
   const text = draft.value.trim();
   if (!text) return;
 
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    console.warn("WebSocket not connected, cannot send");
+    return;
+  }
+
   sending.value = true;
   try {
-    await chatStore.sendMessage(roomId.value, text);
+    socket.send(
+      JSON.stringify({
+        type: "chat_message",
+        text,
+      })
+    );
     draft.value = "";
   } finally {
     sending.value = false;
   }
-}
-
-// wird jetzt nur noch benutzt, falls du Fallback willst
-function isOwnMessage(m) {
-  return !!m.isMine;
 }
 </script>
 
@@ -120,32 +209,11 @@ function isOwnMessage(m) {
 }
 
 .chat-messages {
-  background: #0a0a0f;
+  background: #ffffff;
 }
 
 .self-message {
   display: flex;
   justify-content: flex-end;
-}
-
-.other-message {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.bubble {
-  max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  color: white;
-}
-
-.self-message .bubble {
-  background: #7c3aed;
-}
-
-.chat-input {
-  background: #101018;
 }
 </style>

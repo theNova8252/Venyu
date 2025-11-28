@@ -1,6 +1,5 @@
 <template>
   <q-page padding class="column">
-
     <h4>Your Chats</h4>
 
     <div v-if="loading" class="text-grey">Loading...</div>
@@ -18,17 +17,23 @@
       >
         <q-item-section avatar>
           <q-avatar>
-            <img :src="c.user.avatar">
+            <img :src="c.user.avatar" />
           </q-avatar>
         </q-item-section>
 
         <q-item-section>
-          <q-item-label>{{ c.user.name }}</q-item-label>
-          <q-item-label caption>{{ c.user.bio }}</q-item-label>
+          <q-item-label>
+            {{ c.user.name }}
+            <span v-if="isUserOnline(c.user.id)" class="online-dot"></span>
+          </q-item-label>
+
+          <q-item-label caption>
+            {{ c.user.bio }}
+          </q-item-label>
         </q-item-section>
 
         <q-item-section side>
-          <q-icon name="chevron_right"/>
+          <q-icon name="chevron_right" />
         </q-item-section>
       </q-item>
     </q-list>
@@ -36,21 +41,37 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
-import { useChatsStore } from '@/stores/chats';
-import { useRouter } from 'vue-router';
+import { onMounted } from "vue";
+import { useChatsStore } from "@/stores/chats";
+import { useRouter } from "vue-router";
+import { usePresenceStore } from "@/stores/active";
 
 const chats = useChatsStore();
 const router = useRouter();
+const presenceStore = usePresenceStore(); 
+
 
 onMounted(() => {
+  presenceStore.connect();
   chats.fetchChats();
 });
+const isUserOnline = (userId) => presenceStore.isOnline(userId);
 
 const list = chats.list;
 const loading = chats.loading;
 
 function openChat(roomId) {
-  router.push({ name: 'ChatView', params: { roomId } });
+  router.push({ name: "ChatView", params: { roomId } });
 }
 </script>
+
+<style scoped>
+.online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #21ba45; /* Quasar "positive" */
+}
+</style>

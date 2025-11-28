@@ -67,7 +67,7 @@ export async function createMessage(req, res, next) {
     });
 
     const obj = msg.toJSON();
-    obj.isMine = true; // gerade gesendet → immer von mir
+    obj.isMine = true; // gerade gesendet  immer von mir
 
     return res.status(201).json(obj);
   } catch (err) {
