@@ -33,12 +33,30 @@ ChatMessage.init(
       allowNull: false,
       defaultValue: 'aes-gcm-v1',
     },
+
+    // ✅ Read Receipt Speicherung (1:1 Chat)
+    readAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'read_at',
+    },
+    readBy: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'read_by',
+    },
   },
   {
     sequelize,
     modelName: 'ChatMessage',
     tableName: 'chat_messages',
     timestamps: true,
+    indexes: [
+      { fields: ['room_id'] },
+      { fields: ['sender_id'] },
+      { fields: ['createdAt'] },
+      { fields: ['read_at'] },
+    ],
   },
 );
 

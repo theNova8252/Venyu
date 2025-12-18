@@ -1,53 +1,46 @@
 // src/api/real.js
 const baseFetch = async (url, options = {}) => {
   const res = await fetch(url, {
-    credentials: 'include',
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(options.headers || {}),
     },
     ...options,
   });
 
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(text || `Request failed: ${res.status}`);
   }
 
-  return res.json();
+  const txt = await res.text().catch(() => "");
+  return txt ? JSON.parse(txt) : null;
 };
 
 export const realAPI = {
-  // User-Profil (für deinen UserStore / SwipeCard)
   async getMe() {
-    // Annahme: /api/user/me gibt dein erweitertes Profil mit topArtists, genres etc.
-    return baseFetch('/api/user/me');
+    return baseFetch("/api/user/me");
   },
 
-  // Matches – aktuell keine echte Route => stabil: leeres Array
-  async getMatches() {
-    return [];
+  async getMatchesCandidates() {
+    return baseFetch("/api/matches/candidates");
   },
 
-  // Events – aktuell keine echte Route => stabil: leeres Array
-  async getEventsNearby() {
-    return [];
+  // ✅ WICHTIG: jetzt wird wirklich gespeichert
+  async likeMatch(otherUserId) {
+    return baseFetch(`/api/matches/${encodeURIComponent(otherUserId)}/like`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
   },
 
-  // Like – vorerst no-op (kein Fehler)
-  async likeMatch(/* id */) {
-    return;
+  // Chats = Matches die wirklich existieren
+  async getChatRooms() {
+    return baseFetch("/api/chat/rooms");
   },
 
-  // 💬 Chat
   async getChatMessages(roomId) {
     return baseFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`);
-  },
-
-  async sendChatMessage(roomId, text, senderId) {
-    return baseFetch(`/api/chat/rooms/${encodeURIComponent(roomId)}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({ text, senderId }),
-    });
   },
 };

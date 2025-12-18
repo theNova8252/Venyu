@@ -7,21 +7,21 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
-<<<<<<< Updated upstream
   fetchCurrentlyPlaying,
-=======
   fetchDevices,
   startPlayback,
->>>>>>> Stashed changes
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 
 dotenv.config();
 
+const isDev = (process.env.MODE || process.env.NODE_ENV) !== 'production';
+
+// In Dev (http://127.0.0.1) müssen Cookies ohne secure+sameSite none laufen.
 const COOKIE_OPTS_BASE = {
   httpOnly: true,
-  sameSite: 'none',
-  secure: true,
+  sameSite: isDev ? 'lax' : 'none',
+  secure: !isDev,
   path: '/',
 };
 
@@ -39,7 +39,7 @@ export const callback = async (req, res) => {
 
     const tokens = await exchangeCodeForTokens(code);
 
-    const [me, topArtistsRes, topTracksRes] = await Promise.all([
+    const [meProfile, topArtistsRes, topTracksRes] = await Promise.all([
       fetchMe(tokens.access_token),
       fetchTopArtists(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
       fetchTopTracks(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
@@ -47,7 +47,7 @@ export const callback = async (req, res) => {
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-    const topArtists = topArtistsRes.items.map((a) => ({
+    const topArtists = (topArtistsRes?.items || []).map((a) => ({
       id: a.id,
       name: a.name,
       genres: a.genres,
@@ -57,7 +57,7 @@ export const callback = async (req, res) => {
       followers: a.followers,
     }));
 
-    const topTracks = topTracksRes.items.map((t) => ({
+    const topTracks = (topTracksRes?.items || []).map((t) => ({
       id: t.id,
       name: t.name,
       uri: t.uri,
@@ -69,26 +69,25 @@ export const callback = async (req, res) => {
         name: t.album?.name,
         image: t.album?.images?.[0]?.url ?? null,
       },
-      artists:
-        t.artists?.map((a) => ({
-          id: a.id,
-          name: a.name,
-          uri: a.uri,
-        })) ?? [],
+      artists: (t.artists || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        uri: a.uri,
+      })),
     }));
 
     const genresSet = new Set();
     topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
     const genres = Array.from(genresSet);
 
-    let user = await User.findOne({ where: { spotifyId: me.id } });
+    let user = await User.findOne({ where: { spotifyId: meProfile.id } });
 
     const userPayload = {
-      displayName: me.display_name ?? null,
-      email: me.email ?? null,
-      avatarUrl: me.images?.[0]?.url ?? null,
-      country: me.country ?? null,
-      product: me.product ?? null,
+      displayName: meProfile.display_name ?? null,
+      email: meProfile.email ?? null,
+      avatarUrl: meProfile.images?.[0]?.url ?? null,
+      country: meProfile.country ?? null,
+      product: meProfile.product ?? null,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
       tokenExpiresAt: expiresAt,
@@ -101,10 +100,11 @@ export const callback = async (req, res) => {
     else {
       user = await User.create({
         ...userPayload,
-        spotifyId: me.id,
+        spotifyId: meProfile.id,
       });
     }
 
+    // cookies
     res.cookie('at', tokens.access_token, {
       ...COOKIE_OPTS_BASE,
       maxAge: tokens.expires_in * 1000,
@@ -117,6 +117,7 @@ export const callback = async (req, res) => {
       });
     }
 
+    // redirect back
     const ret = (() => {
       try {
         return JSON.parse(Buffer.from(state || '', 'base64').toString())?.returnTo;
@@ -128,11 +129,12 @@ export const callback = async (req, res) => {
     const to = ret || process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
     return res.redirect(to);
   } catch (e) {
-    console.error('Callback error:', e);
-    return res.status(500).send(e?.message || 'Error');
+    console.error('Callback error:', e?.message || e);
+    return res.status(500).send(e?.message || 'callback_failed');
   }
 };
 
+// ======================= ME ==========================
 export const me = async (req, res, next) => {
   try {
     const { at } = req.cookies || {};
@@ -158,6 +160,7 @@ export const me = async (req, res, next) => {
   }
 };
 
+// ======================= REFRESH =====================
 export const refresh = async (req, res, next) => {
   try {
     const cookieRt = (req.cookies && req.cookies.rt) || null;
@@ -167,9 +170,10 @@ export const refresh = async (req, res, next) => {
     if (!rt) return res.status(400).json({ error: 'missing_refresh_token' });
 
     const data = await refreshAccessToken(rt);
-    const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
+    // save to user
     const profile = await fetchMe(data.access_token);
+    const expiresAt = new Date(Date.now() + data.expires_in * 1000);
 
     const updates = {
       accessToken: data.access_token,
@@ -179,6 +183,7 @@ export const refresh = async (req, res, next) => {
 
     await User.update(updates, { where: { spotifyId: profile.id } });
 
+    // cookies
     if (data.refresh_token) {
       res.cookie('rt', data.refresh_token, {
         ...COOKIE_OPTS_BASE,
@@ -195,23 +200,24 @@ export const refresh = async (req, res, next) => {
       expires_in: data.expires_in,
       refreshed: true,
     });
-  } catch (err) {
-    return next(err);
+  } catch (e) {
+    console.error('refresh error:', e?.message || e);
+    return next(e);
   }
 };
 
-export const logout = async (req, res, next) => {
+// ======================= LOGOUT ======================
+export const logout = async (_req, res, next) => {
   try {
     res.clearCookie('at', { path: '/' });
     res.clearCookie('rt', { path: '/' });
     return res.json({ success: true });
-  } catch (err) {
-    return next(err);
+  } catch (e) {
+    return next(e);
   }
 };
 
-<<<<<<< Updated upstream
-// currently playing
+// ======================= CURRENTLY PLAYING ===========
 export const syncCurrentlyPlaying = async (req, res, next) => {
   try {
     const { at } = req.cookies || {};
@@ -221,7 +227,8 @@ export const syncCurrentlyPlaying = async (req, res, next) => {
     const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).end();
 
-    if (!user.shareCurrentlyPlaying) {
+    // optional flag
+    if (user.shareCurrentlyPlaying === false) {
       await user.update({ currentlyPlaying: null });
       return res.json({ ok: true });
     }
@@ -230,20 +237,26 @@ export const syncCurrentlyPlaying = async (req, res, next) => {
 
     const payload = data?.item
       ? {
-        isPlaying: true,
-        updatedAt: new Date().toISOString(),
-        track: {
-          name: data.item.name,
-          artists: data.item.artists.map((a) => a.name),
-          albumImage: data.item.album.images?.[0]?.url ?? null,
-        },
-      }
+          isPlaying: true,
+          updatedAt: new Date().toISOString(),
+          track: {
+            name: data.item.name,
+            artists: (data.item.artists || []).map((a) => a.name),
+            albumImage: data.item.album?.images?.[0]?.url ?? null,
+            uri: data.item.uri,
+          },
+        }
       : { isPlaying: false, updatedAt: new Date().toISOString() };
 
     await user.update({ currentlyPlaying: payload });
     return res.json(payload);
-=======
-export const devices = async (req, res, next) => {
+  } catch (e) {
+    return next(e);
+  }
+};
+
+// ======================= DEVICES =====================
+export const devices = async (req, res) => {
   try {
     const { at } = req.cookies || {};
     if (!at) return res.status(401).json({ error: 'no_access_token' });
@@ -251,11 +264,13 @@ export const devices = async (req, res, next) => {
     const data = await fetchDevices(at);
     return res.json(data);
   } catch (e) {
-    return next(e);
+    console.error('devices error:', e?.message || e);
+    return res.status(500).json({ error: e?.message || 'devices_failed' });
   }
 };
 
-export const play = async (req, res, next) => {
+// ======================= PLAY ========================
+export const play = async (req, res) => {
   try {
     const { at } = req.cookies || {};
     if (!at) return res.status(401).json({ error: 'no_access_token' });
@@ -264,10 +279,18 @@ export const play = async (req, res, next) => {
     if (!trackUri) return res.status(400).json({ error: 'missing_trackUri' });
 
     let finalDeviceId = deviceId || null;
+
     if (!finalDeviceId) {
       const devs = await fetchDevices(at);
       const active = devs?.devices?.find((d) => d.is_active);
       finalDeviceId = active?.id || devs?.devices?.[0]?.id || null;
+
+      if (!finalDeviceId) {
+        return res.status(409).json({
+          error: 'no_device_available',
+          hint: 'Öffne Spotify (Handy/Desktop) und starte kurz einen Song, dann nochmal.',
+        });
+      }
     }
 
     await startPlayback(at, {
@@ -277,8 +300,11 @@ export const play = async (req, res, next) => {
     });
 
     return res.json({ ok: true, deviceId: finalDeviceId });
->>>>>>> Stashed changes
   } catch (e) {
-    return next(e);
+    console.error('play error:', e?.message || e);
+    return res.status(500).json({
+      error: e?.message || 'play_failed',
+      hint: 'Wenn 403: oft Premium/Scopes/Token.',
+    });
   }
 };

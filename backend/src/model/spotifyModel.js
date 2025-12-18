@@ -1,165 +1,160 @@
+// backend/src/model/spotifyModel.js
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI } = process.env;
+const SPOTIFY_AUTH = 'https://accounts.spotify.com';
+const SPOTIFY_API = 'https://api.spotify.com/v1';
 
-const TOKEN_URL = 'https://accounts.spotify.com/api/token';
-const AUTH_URL = 'https://accounts.spotify.com/authorize';
+function assertEnv(name) {
+  if (!process.env[name]) throw new Error(`Missing env: ${name}`);
+}
 
-const SCOPES = [
-  'user-read-email',
-  'user-read-private',
-  'user-top-read',
-  'playlist-read-private',
-<<<<<<< Updated upstream
-  'user-read-currently-playing',
-  'user-read-playback-state',
-=======
-
-  'user-read-playback-state',
-  'user-modify-playback-state',
->>>>>>> Stashed changes
-].join(' ');
-
-// -------- Helpers --------
 function basicAuthHeader() {
-  const b64 = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  assertEnv('SPOTIFY_CLIENT_ID');
+  assertEnv('SPOTIFY_CLIENT_SECRET');
+  const raw = `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`;
+  const b64 = Buffer.from(raw).toString('base64');
   return `Basic ${b64}`;
 }
 
-async function spotifyGet(accessToken, path, params = {}) {
-  const url = new URL(`https://api.spotify.com/v1${path}`);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v != null) url.searchParams.set(k, String(v));
-  });
-
+async function spotifyFetch(url, accessToken, options = {}) {
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
   });
 
+  if (res.status === 204) return null;
+
+  const text = await res.text().catch(() => '');
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Spotify GET ${path} failed: ${res.status} ${text}`);
+    throw new Error(text || `Spotify API error ${res.status}`);
   }
-  return res.json();
+
+  return text ? JSON.parse(text) : null;
 }
 
-async function postToken(params) {
-  const res = await fetch(TOKEN_URL, {
+// ================= AUTH =================
+export function buildAuthUrl(state = '') {
+  assertEnv('SPOTIFY_CLIENT_ID');
+  assertEnv('SPOTIFY_REDIRECT_URI');
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: process.env.SPOTIFY_CLIENT_ID,
+    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+    scope: [
+      'user-read-email',
+      'user-read-private',
+      'user-top-read',
+      'user-read-playback-state',
+      'user-modify-playback-state',
+      'user-read-currently-playing',
+      'streaming',
+    ].join(' '),
+    state,
+    show_dialog: 'true',
+  });
+
+  return `${SPOTIFY_AUTH}/authorize?${params.toString()}`;
+}
+
+export async function exchangeCodeForTokens(code) {
+  assertEnv('SPOTIFY_REDIRECT_URI');
+
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+  });
+
+  const res = await fetch(`${SPOTIFY_AUTH}/api/token`, {
     method: 'POST',
     headers: {
       Authorization: basicAuthHeader(),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body: new URLSearchParams(params),
+    body,
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Spotify token request failed: ${res.status} ${text}`);
-  }
-  return res.json();
+  const text = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(text || `token exchange failed ${res.status}`);
+  return JSON.parse(text);
 }
 
-// -------- Public API --------
-export const buildAuthUrl = (state = '') => {
-  const params = new URLSearchParams({
-    client_id: SPOTIFY_CLIENT_ID,
-    response_type: 'code',
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    scope: SCOPES,
-    state,
-    show_dialog: 'false',
-  });
-  return `${AUTH_URL}?${params.toString()}`;
-};
-
-export const exchangeCodeForTokens = async (code) =>
-  postToken({
-    grant_type: 'authorization_code',
-    code,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-  });
-
-export const refreshAccessToken = async (refreshToken) =>
-  postToken({
+export async function refreshAccessToken(refreshToken) {
+  const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
   });
 
-export const fetchMe = async (accessToken) => {
-  const res = await fetch('https://api.spotify.com/v1/me', {
+  const res = await fetch(`${SPOTIFY_AUTH}/api/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: basicAuthHeader(),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+
+  const text = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(text || `token refresh failed ${res.status}`);
+  return JSON.parse(text);
+}
+
+// ================= PROFILE / TOP =================
+export async function fetchMe(accessToken) {
+  return spotifyFetch(`${SPOTIFY_API}/me`, accessToken);
+}
+
+export async function fetchTopArtists(accessToken, { time_range = 'medium_term', limit = 20 } = {}) {
+  const qs = new URLSearchParams({ time_range, limit: String(limit) });
+  return spotifyFetch(`${SPOTIFY_API}/me/top/artists?${qs.toString()}`, accessToken);
+}
+
+export async function fetchTopTracks(accessToken, { time_range = 'medium_term', limit = 20 } = {}) {
+  const qs = new URLSearchParams({ time_range, limit: String(limit) });
+  return spotifyFetch(`${SPOTIFY_API}/me/top/tracks?${qs.toString()}`, accessToken);
+}
+
+// ================= CURRENTLY PLAYING =================
+export async function fetchCurrentlyPlaying(accessToken) {
+  // Spotify returns 204 if nothing playing
+  const res = await fetch(`${SPOTIFY_API}/me/player/currently-playing`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Spotify /me failed: ${res.status} ${text}`);
-  }
-  return res.json();
-};
+  if (res.status === 204) return null;
 
-<<<<<<< Updated upstream
+  const text = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(text || `currently-playing failed ${res.status}`);
+  return text ? JSON.parse(text) : null;
+}
 
+// ================= DEVICES / PLAYBACK =================
+export async function fetchDevices(accessToken) {
+  return spotifyFetch(`${SPOTIFY_API}/me/player/devices`, accessToken);
+}
 
-// Currently Playing
-
-export const fetchCurrentlyPlaying = async (accessToken) => {
-  const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if(res.status === 204) return null;
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Spotify currently playing failed: ${res.status} ${text}`);
- }
-
-  return res.json();
-};
-=======
-export const fetchTopArtists = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/top/artists', { time_range: timeRange, limit });
-
-export const fetchTopTracks = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/top/tracks', { time_range: timeRange, limit });
-
-export const fetchPlaylists = (accessToken, { limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/playlists', { limit });
-
-// ✅ playback helpers
-export const fetchDevices = async (accessToken) =>
-  spotifyGet(accessToken, '/me/player/devices');
-
-export const startPlayback = async (
+export async function startPlayback(
   accessToken,
-  { deviceId, uris, contextUri, offset, positionMs } = {},
-) => {
-  const url = new URL('https://api.spotify.com/v1/me/player/play');
-  if (deviceId) url.searchParams.set('device_id', deviceId);
+  { deviceId = null, uris = [], positionMs = 0 } = {},
+) {
+  const url = deviceId
+    ? `${SPOTIFY_API}/me/player/play?device_id=${encodeURIComponent(deviceId)}`
+    : `${SPOTIFY_API}/me/player/play`;
 
-  const body = {};
-  if (Array.isArray(uris) && uris.length) body.uris = uris;
-  if (contextUri) body.context_uri = contextUri;
-  if (offset != null) body.offset = offset;
-  if (positionMs != null) body.position_ms = positionMs;
-
-  const res = await fetch(url, {
+  // Spotify erwartet: { uris: [...] , position_ms: ... }
+  await spotifyFetch(url, accessToken, {
     method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      uris,
+      position_ms: positionMs,
+    }),
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Spotify play failed: ${res.status} ${text}`);
-  }
 
   return { ok: true };
-};
->>>>>>> Stashed changes
+}

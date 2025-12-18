@@ -204,9 +204,22 @@ function broadcastToRoom(roomId, payload) {
   const set = rooms.get(roomId);
   if (!set) return;
 
+  const json = JSON.stringify(payload);
   for (const client of set) {
     if (client.readyState !== client.OPEN) continue;
-    client.send(JSON.stringify(payload));
+    client.send(json);
+  }
+}
+
+function broadcastToRoomExcept(roomId, payload, exceptWs) {
+  const set = rooms.get(roomId);
+  if (!set) return;
+
+  const json = JSON.stringify(payload);
+  for (const client of set) {
+    if (client === exceptWs) continue;
+    if (client.readyState !== client.OPEN) continue;
+    client.send(json);
   }
 }
 
@@ -262,32 +275,61 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
             try {
               const msg = JSON.parse(data.toString());
 
-              // Key exchange: relay only
+              // Key exchange: relay only (an andere Clients im Room)
               if (msg.type === 'key_exchange') {
-                broadcastToRoom(roomId, {
-                  type: 'key_exchange',
-                  fromUserId: ws.userId,
-                  publicKeyJwk: msg.publicKeyJwk,
-                });
+                broadcastToRoomExcept(
+                  roomId,
+                  {
+                    type: 'key_exchange',
+                    fromUserId: ws.userId,
+                    publicKeyJwk: msg.publicKeyJwk,
+                  },
+                  ws,
+                );
                 return;
               }
 
-              // typing indicator
+              // typing indicator (nur an andere)
               if (msg.type === 'typing') {
-                broadcastToRoom(roomId, {
-                  type: 'typing',
-                  fromUserId: ws.userId,
-                  isTyping: !!msg.isTyping,
-                });
+                broadcastToRoomExcept(
+                  roomId,
+                  {
+                    type: 'typing',
+                    fromUserId: ws.userId,
+                    isTyping: !!msg.isTyping,
+                  },
+                  ws,
+                );
                 return;
               }
 
-              // read receipt
+              // ✅ read receipt (vereinheitlicht auf lastReadMessageId)
               if (msg.type === 'read') {
+                const { lastReadMessageId } = msg;
+                if (!lastReadMessageId) return;
+
+                const last = await ChatMessage.findByPk(String(lastReadMessageId));
+                if (last && String(last.roomId) === String(roomId)) {
+                  await ChatMessage.update(
+                    {
+                      readAt: new Date(),
+                      readBy: String(ws.userId),
+                    },
+                    {
+                      where: {
+                        roomId,
+                        senderId: { [Op.ne]: String(ws.userId) },
+                        readAt: null,
+                        createdAt: { [Op.lte]: last.createdAt },
+                      },
+                    },
+                  );
+                }
+
                 broadcastToRoom(roomId, {
                   type: 'read',
                   fromUserId: ws.userId,
-                  lastReadMessageId: msg.lastReadMessageId || null,
+                  lastReadMessageId: String(lastReadMessageId),
                 });
                 return;
               }
@@ -299,17 +341,17 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
 
                 const saved = await ChatMessage.create({
                   roomId,
-                  senderId: ws.userId,
+                  senderId: String(ws.userId),
                   ciphertext,
                   iv,
                   version: version || 'aes-gcm-v1',
+                  readAt: null,
+                  readBy: null,
                 });
-
-                const obj = saved.toJSON();
 
                 broadcastToRoom(roomId, {
                   type: 'chat_message',
-                  message: obj,
+                  message: saved.toJSON(),
                 });
                 return;
               }

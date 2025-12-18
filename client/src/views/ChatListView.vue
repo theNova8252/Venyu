@@ -41,24 +41,24 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, computed } from "vue";
 import { useChatsStore } from "@/stores/chats";
 import { useRouter } from "vue-router";
 import { usePresenceStore } from "@/stores/active";
 
 const chats = useChatsStore();
 const router = useRouter();
-const presenceStore = usePresenceStore(); 
-
+const presenceStore = usePresenceStore();
 
 onMounted(() => {
   presenceStore.connect();
   chats.fetchChats();
 });
-const isUserOnline = (userId) => presenceStore.isOnline(userId);
 
-const list = chats.list;
-const loading = chats.loading;
+const list = computed(() => chats.list);
+const loading = computed(() => chats.loading);
+
+const isUserOnline = (userId) => presenceStore.isOnline(userId);
 
 function openChat(roomId) {
   router.push({ name: "ChatView", params: { roomId } });
@@ -72,6 +72,6 @@ function openChat(roomId) {
   height: 8px;
   margin-left: 6px;
   border-radius: 50%;
-  background: #21ba45; /* Quasar "positive" */
+  background: #21ba45;
 }
 </style>
