@@ -58,15 +58,19 @@ export const updateMeProfile = async (req, res, next) => {
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
     const sp = await fetchMe(at);
-    const { bio, isVisible } = req.body || {};
+    const { bio, isVisible, shareCurrentlyPlaying } = req.body || {};
 
     const [count] = await User.update(
-      {
-        bio: bio ?? null,
-        ...(typeof isVisible === 'boolean' ? { isVisible } : {}),
-      },
-      { where: { spotifyId: sp.id } },
-    );
+  {
+    ...(typeof bio === 'string' ? { bio } : {}),
+    ...(typeof isVisible === 'boolean' ? { isVisible } : {}),
+    ...(typeof shareCurrentlyPlaying === 'boolean'
+      ? { shareCurrentlyPlaying }
+      : {}),
+  },
+  { where: { spotifyId: sp.id } }
+);
+
 
     if (!count) return res.status(404).json({ error: 'user_not_found' });
     return res.json({ updated: true });

@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { api } from '@/api';
 
 export const useMatchesStore = defineStore('matches', {
-  state: () => ({ list: [], loading: false, error: null }),
+  state: () => ({ list: [], loading: false, error: null, ws: null, }),
   actions: {
     async fetchMatches() {
       this.loading = true;
@@ -35,5 +35,32 @@ export const useMatchesStore = defineStore('matches', {
         throw e;
       }
     },
+
+    // currently playing
+    connectNowPlayingWS() {
+  if (this.ws) return; // 🔒 schon verbunden
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  this.ws = new WebSocket(`${proto}://${location.host}/ws/now-playing`);
+
+  this.ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type !== 'now_playing') return;
+
+    const idx = this.list.findIndex(
+      (u) => u.id === msg.userId || u.userId === msg.userId
+    );
+
+    if (idx !== -1) {
+      this.list[idx].currentlyPlaying = msg.currentlyPlaying;
+    }
+  };
+
+  this.ws.onclose = () => {
+    this.ws = null;
+  };
+},
+
   },
 });

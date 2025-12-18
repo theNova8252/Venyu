@@ -111,6 +111,35 @@
                   {{ genre }}
                 </div>
               </div>
+
+              <!--currently playing-->
+
+              <div
+                v-if="card.currentlyPlaying?.isPlaying"
+                class="music-section now-playing"
+              >
+                <div class="music-header">
+                  <q-icon name="headphones" size="20px" color="green-5" />
+                  <span class="music-title">Currently Playing</span>
+                </div>
+
+                <div class="now-playing-row">
+                  <img
+                    v-if="card.currentlyPlaying.track?.albumImage"
+                    :src="card.currentlyPlaying.track.albumImage"
+                    class="now-playing-cover"
+                  />
+
+                  <div class="now-playing-info">
+                    <div class="track">
+                      {{ card.currentlyPlaying.track.name }}
+                    </div>
+                    <div class="artist">
+                      {{ card.currentlyPlaying.track.artists.join(" · ") }}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -198,11 +227,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
+
 import { useQuasar } from "quasar";
 import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
 import { useMatchesStore } from "@/stores/matches";
 import { useChatsStore } from "@/stores/chats";
+import { currentlyPlaying } from "../../../backend/src/controller/spotifyController";
 
 const $q = useQuasar();
 const userStore = useUserStore();
@@ -220,7 +251,6 @@ const chatsStore = useChatsStore();
 // Karten direkt aus den Matches
 const cards = computed(() =>
   matchesStore.list.map((m, index) => ({
-    // hier musst du die Felder an dein Backend anpassen:
     id: m.id ?? m.userId ?? `match-${index}`,
     userId: m.id ?? m.userId, // wichtig für Like-Endpoint
     name: m.displayName ?? m.name ?? "Unknown",
@@ -237,6 +267,7 @@ const cards = computed(() =>
     topArtists: m.topArtists ?? m.spotifyTopArtists ?? [],
     genres: m.genres ?? m.spotifyGenres ?? [],
     matchScore: m.matchScore ?? m.compatibility ?? 90,
+    currentlyPlaying: m.currentlyPlaying ?? null,
   }))
 );
 
@@ -331,11 +362,14 @@ const sendMessage = () => {
   });
 };
 
+// currentlyPlaying
+
 onMounted(async () => {
   if (!userStore.me) {
     await userStore.fetchMe();
   }
   await matchesStore.fetchMatches();
+  matchesStore.connectNowPlayingWS();
 });
 </script>
 
@@ -762,5 +796,35 @@ onMounted(async () => {
     width: 100px;
     height: 100px;
   }
+
+  // currently playing
+.now-playing {
+  margin-top: 0.6rem;
+}
+
+.now-playing-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.now-playing-cover {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.now-playing-info .track {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: white;
+}
+
+.now-playing-info .artist {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 }
 </style>

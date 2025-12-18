@@ -7,8 +7,10 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
+  fetchCurrentlyPlaying,
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
+
 
 dotenv.config();
 
@@ -206,3 +208,41 @@ export const logout = async (req, res, next) => {
     return next(err);
   }
 };
+
+
+// currently playing
+export const syncCurrentlyPlaying = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).end();
+
+    const profile = await fetchMe(at);
+    const user = await User.findOne({ where: { spotifyId: profile.id } });
+    if (!user) return res.status(404).end();
+
+    if (!user.shareCurrentlyPlaying) {
+      await user.update({ currentlyPlaying: null });
+      return res.json({ ok: true });
+    }
+
+    const data = await currentlyPlaying(at);
+
+    const payload = data?.item
+      ? {
+          isPlaying: true,
+          updatedAt: new Date().toISOString(),
+          track: {
+            name: data.item.name,
+            artists: data.item.artists.map(a => a.name),
+            albumImage: data.item.album.images?.[0]?.url ?? null,
+          },
+        }
+      : { isPlaying: false, updatedAt: new Date().toISOString() };
+
+    await user.update({ currentlyPlaying: payload });
+    res.json(payload);
+  } catch (e) {
+    next(e);
+  }
+};
+

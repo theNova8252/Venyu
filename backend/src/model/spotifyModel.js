@@ -12,6 +12,8 @@ const SCOPES = [
   'user-read-private',
   'user-top-read',
   'playlist-read-private',
+  'user-read-currently-playing',
+  'user-read-playback-state',
 ].join(' ');
 
 // -------- Helpers --------
@@ -95,5 +97,25 @@ export const fetchMe = async (accessToken) => {
     const text = await res.text().catch(() => '');
     throw new Error(`Spotify /me failed: ${res.status} ${text}`);
   }
+  return res.json();
+};
+
+
+
+// Currently Playing
+
+export const fetchCurrentlyPlaying = async (accessToken) => {
+  const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if(res.status === 204) return null;
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Spotify currently playing failed: ${res.status} ${text}`);
+ }
+
   return res.json();
 };
