@@ -233,7 +233,6 @@ import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
 import { useMatchesStore } from "@/stores/matches";
 import { useChatsStore } from "@/stores/chats";
-import { currentlyPlaying } from "../../../backend/src/controller/spotifyController";
 
 const $q = useQuasar();
 const userStore = useUserStore();

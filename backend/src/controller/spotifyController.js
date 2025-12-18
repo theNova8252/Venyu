@@ -11,7 +11,6 @@ import {
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 
-
 dotenv.config();
 
 const COOKIE_OPTS_BASE = {
@@ -209,7 +208,6 @@ export const logout = async (req, res, next) => {
   }
 };
 
-
 // currently playing
 export const syncCurrentlyPlaying = async (req, res, next) => {
   try {
@@ -225,24 +223,23 @@ export const syncCurrentlyPlaying = async (req, res, next) => {
       return res.json({ ok: true });
     }
 
-    const data = await currentlyPlaying(at);
+    const data = await fetchCurrentlyPlaying(at);
 
     const payload = data?.item
       ? {
-          isPlaying: true,
-          updatedAt: new Date().toISOString(),
-          track: {
-            name: data.item.name,
-            artists: data.item.artists.map(a => a.name),
-            albumImage: data.item.album.images?.[0]?.url ?? null,
-          },
-        }
+        isPlaying: true,
+        updatedAt: new Date().toISOString(),
+        track: {
+          name: data.item.name,
+          artists: data.item.artists.map((a) => a.name),
+          albumImage: data.item.album.images?.[0]?.url ?? null,
+        },
+      }
       : { isPlaying: false, updatedAt: new Date().toISOString() };
 
     await user.update({ currentlyPlaying: payload });
-    res.json(payload);
+    return res.json(payload);
   } catch (e) {
-    next(e);
+    return next(e);
   }
 };
-

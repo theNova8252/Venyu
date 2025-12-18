@@ -14,6 +14,7 @@ import userRoutes from './api/routes/userRoutes.js';
 import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import eventRoutes from './api/routes/eventRoutes.js';
+import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
 
 import http from 'http';                 
 import { WebSocketServer } from 'ws';    
@@ -76,6 +77,7 @@ app.use('/api/spotify', spotifyRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/events', eventRsvpRoutes);
 
 // === Matches: Kandidaten für Discover ===
 app.get('/api/matches/candidates', async (req, res, next) => {

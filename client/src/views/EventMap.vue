@@ -16,6 +16,24 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const events = useEventsStore();
 
+function showNotification(message, type = 'interested') {
+  const notification = document.createElement('div');
+  notification.className = `event-notification ${type}`;
+  notification.innerHTML = `
+    <div class="notification-icon">${type === 'interested' ? '★' : '✓'}</div>
+    <div class="notification-message">${message}</div>
+  `;
+
+  document.body.appendChild(notification);
+
+  setTimeout(() => notification.classList.add('show'), 10);
+
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 2500);
+}
+
 function buildCarouselPopup(group) {
   let currentIndex = 0;
 
@@ -24,55 +42,68 @@ function buildCarouselPopup(group) {
 
   const render = () => {
     const event = group[currentIndex];
+    const { interested, going } = events.getRsvp(event.id);
 
     container.innerHTML = `
-      <div class="popup-content">
-        <div class="popup-title">${event.title}</div>
-        <div class="popup-venue">${event.venue || "Venue"}</div>
-        <div class="popup-location">${event.city}</div>
-        <div class="popup-date">${new Date(event.date).toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+  <div class="popup-content">
+    <div class="popup-title">${event.title}</div>
+    <div class="popup-venue">${event.venue || "Venue"}</div>
+    <div class="popup-location">${event.city}</div>
+    <div class="popup-date">${new Date(event.date).toLocaleDateString('en-US', {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
     })}</div>
-        ${event.url ? `<a class="popup-link" href="${event.url}" target="_blank" rel="noopener">Get Tickets</a>` : ''}
-      </div>
-      
-      ${group.length > 1 ? `
-        <div class="popup-nav">
-          <button class="nav-btn prev" data-action="prev">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M10 12L6 8L10 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <div class="nav-counter">${currentIndex + 1} / ${group.length}</div>
-          <button class="nav-btn next" data-action="next">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      ` : ''}
-    `;
+
+    <div class="popup-actions">
+      <button class="action-btn ${interested ? "active interested" : ""}"
+        data-action="toggleInterested" data-id="${event.id}">
+        ${interested ? "★ Interested" : "☆ Add Interested"}
+      </button>
+
+      <button class="action-btn ${going ? "active going" : ""}"
+        data-action="toggleGoing" data-id="${event.id}">
+        ${going ? "✔ Going" : "＋ Add Going"}
+      </button>
+    </div>
+
+    ${event.url ? `<a class="popup-link" href="${event.url}" target="_blank" rel="noopener">Get Tickets</a>` : ''}
+  </div>
+
+  ${group.length > 1 ? `
+    <div class="popup-nav">
+      <button class="nav-btn" data-action="prev">‹</button>
+      <div class="nav-counter">${currentIndex + 1} / ${group.length}</div>
+      <button class="nav-btn" data-action="next">›</button>
+    </div>
+  ` : ''}
+`;
   };
 
   render();
 
-  container.addEventListener("click", (e) => {
-    const button = e.target.closest(".nav-btn");
+  let saving = false;
+
+  container.addEventListener("click", async (e) => {
+    const button = e.target.closest("button.nav-btn, button.action-btn");
     if (!button) return;
 
     const action = button.dataset.action;
-    if (action === "next") {
-      currentIndex = (currentIndex + 1) % group.length;
-    } else if (action === "prev") {
-      currentIndex = (currentIndex - 1 + group.length) % group.length;
+
+    if (action === "next") { currentIndex = (currentIndex + 1) % group.length; render(); return; }
+    if (action === "prev") { currentIndex = (currentIndex - 1 + group.length) % group.length; render(); return; }
+
+    if (saving) return;           // 🔒 spam-schutz
+    saving = true;
+
+    const id = button.dataset.id;
+
+    try {
+      if (action === "toggleInterested") await events.toggleInterested(id);
+      if (action === "toggleGoing") await events.toggleGoing(id);
+    } finally {
+      saving = false;
+      render();                   // ✅ render AFTER async finished
     }
-
-    render();
   });
-
   return container;
 }
 
@@ -186,45 +217,50 @@ onMounted(async () => {
 .marker-dot {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%);
-  border: 4px solid white;
+  background: linear-gradient(145deg, #ec4899 0%, #8b5cf6 100%);
+  border: 3px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
   box-shadow:
-    0 4px 20px rgba(236, 72, 153, 0.6),
-    0 0 0 4px rgba(236, 72, 153, 0.1);
+    0 4px 16px rgba(236, 72, 153, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
 .venue-marker:hover .marker-dot {
   box-shadow:
-    0 6px 30px rgba(236, 72, 153, 0.8),
-    0 0 0 8px rgba(236, 72, 153, 0.15);
+    0 8px 24px rgba(236, 72, 153, 0.7),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+  transform: scale(1.05);
 }
 
 .marker-center {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   background: white;
   border-radius: 50%;
-  opacity: 0.9;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .marker-badge {
   position: absolute;
   top: -6px;
   right: -6px;
-  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
   color: white;
   font-size: 11px;
   font-weight: 900;
   padding: 4px 7px;
   border-radius: 999px;
-  border: 3px solid white;
-  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.6);
+  border: 2.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 3px 12px rgba(124, 58, 237, 0.6),
+    0 1px 4px rgba(0, 0, 0, 0.2);
   min-width: 22px;
   text-align: center;
   line-height: 1;
@@ -271,21 +307,24 @@ onMounted(async () => {
 }
 
 .popup-link {
-  display: inline-block;
-  font-size: 13px;
+  display: block;
+  text-align: center;
+  font-size: 14px;
   font-weight: 700;
   color: white;
   text-decoration: none;
-  background: linear-gradient(135deg, #ec4899, #a855f7);
-  padding: 10px 16px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3);
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+  padding: 12px 18px;
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.35);
+  margin-top: 4px;
 }
 
 .popup-link:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.5);
+  background: linear-gradient(135deg, #db2777, #7c3aed);
 }
 
 .popup-nav {
@@ -299,28 +338,31 @@ onMounted(async () => {
 }
 
 .nav-btn {
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(139, 92, 246, 0.08));
+  border: 1.5px solid rgba(139, 92, 246, 0.25);
   color: #8b5cf6;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .nav-btn:hover {
-  background: rgba(139, 92, 246, 0.2);
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(139, 92, 246, 0.15));
   border-color: rgba(139, 92, 246, 0.4);
-  transform: scale(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
 }
 
 .nav-btn:active {
-  transform: scale(0.95);
+  transform: translateY(0);
 }
 
 .nav-counter {
@@ -375,5 +417,107 @@ onMounted(async () => {
 
 :global(.mapbox-gl-popup-anchor-right .mapbox-gl-popup-tip) {
   border-left-color: white !important;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  margin-bottom: 12px;
+}
+
+.action-btn {
+  flex: 1;
+  border: 1.5px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #4a4a4a;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+.action-btn.active.interested {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(236, 72, 153, 0.08));
+  border-color: rgba(236, 72, 153, 0.4);
+  color: #db2777;
+  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+}
+
+.action-btn.active.going {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.08));
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #7c3aed;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+}
+
+/* Notification styles */
+.event-notification {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120px);
+  background: white;
+  padding: 14px 24px;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  pointer-events: none;
+  min-width: 240px;
+}
+
+.event-notification.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.event-notification.interested .notification-icon {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.15), rgba(236, 72, 153, 0.08));
+  color: #db2777;
+  border: 2px solid rgba(236, 72, 153, 0.3);
+}
+
+.event-notification.going .notification-icon {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.08));
+  color: #7c3aed;
+  border: 2px solid rgba(139, 92, 246, 0.3);
+}
+
+.notification-message {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.4;
 }
 </style>
