@@ -11,19 +11,27 @@ ChatMessage.init(
       primaryKey: true,
     },
     roomId: {
-      // Identifiziert einen Chat-Room, z.B. "user-3" oder eine Match-ID
       type: DataTypes.STRING,
       allowNull: false,
       field: 'room_id',
     },
     senderId: {
       type: DataTypes.STRING,
-      allowNull: true,
+      allowNull: false,
       field: 'sender_id',
     },
-    text: {
-      type: DataTypes.TEXT,
+    ciphertext: {
+      type: DataTypes.TEXT, // base64
       allowNull: false,
+    },
+    iv: {
+      type: DataTypes.STRING, // base64
+      allowNull: false,
+    },
+    version: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'aes-gcm-v1',
     },
   },
   {

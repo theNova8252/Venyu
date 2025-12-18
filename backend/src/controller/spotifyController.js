@@ -7,7 +7,12 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
+<<<<<<< Updated upstream
   fetchCurrentlyPlaying,
+=======
+  fetchDevices,
+  startPlayback,
+>>>>>>> Stashed changes
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 
@@ -34,7 +39,6 @@ export const callback = async (req, res) => {
 
     const tokens = await exchangeCodeForTokens(code);
 
-    // Fetch Spotify data in parallel to speed it up
     const [me, topArtistsRes, topTracksRes] = await Promise.all([
       fetchMe(tokens.access_token),
       fetchTopArtists(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
@@ -93,16 +97,13 @@ export const callback = async (req, res) => {
       genres,
     };
 
-    if (user) {
-      await user.update(userPayload);
-    } else {
+    if (user) await user.update(userPayload);
+    else {
       user = await User.create({
         ...userPayload,
         spotifyId: me.id,
       });
     }
-
-    console.log('User upserted:', user.id, user.spotifyId);
 
     res.cookie('at', tokens.access_token, {
       ...COOKIE_OPTS_BASE,
@@ -156,6 +157,7 @@ export const me = async (req, res, next) => {
     return next(e);
   }
 };
+
 export const refresh = async (req, res, next) => {
   try {
     const cookieRt = (req.cookies && req.cookies.rt) || null;
@@ -208,6 +210,7 @@ export const logout = async (req, res, next) => {
   }
 };
 
+<<<<<<< Updated upstream
 // currently playing
 export const syncCurrentlyPlaying = async (req, res, next) => {
   try {
@@ -239,6 +242,42 @@ export const syncCurrentlyPlaying = async (req, res, next) => {
 
     await user.update({ currentlyPlaying: payload });
     return res.json(payload);
+=======
+export const devices = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
+
+    const data = await fetchDevices(at);
+    return res.json(data);
+  } catch (e) {
+    return next(e);
+  }
+};
+
+export const play = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
+
+    const { trackUri, deviceId, positionMs } = req.body || {};
+    if (!trackUri) return res.status(400).json({ error: 'missing_trackUri' });
+
+    let finalDeviceId = deviceId || null;
+    if (!finalDeviceId) {
+      const devs = await fetchDevices(at);
+      const active = devs?.devices?.find((d) => d.is_active);
+      finalDeviceId = active?.id || devs?.devices?.[0]?.id || null;
+    }
+
+    await startPlayback(at, {
+      deviceId: finalDeviceId,
+      uris: [trackUri],
+      positionMs: positionMs ?? 0,
+    });
+
+    return res.json({ ok: true, deviceId: finalDeviceId });
+>>>>>>> Stashed changes
   } catch (e) {
     return next(e);
   }

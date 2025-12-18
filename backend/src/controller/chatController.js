@@ -10,7 +10,7 @@ async function getCurrentUser(req) {
     throw err;
   }
 
-  const sp = await fetchMe(at); // Spotify /me
+  const sp = await fetchMe(at);
   const user = await User.findOne({ where: { spotifyId: sp.id } });
 
   if (!user) {
@@ -35,26 +35,23 @@ export async function listMessages(req, res, next) {
 
     const result = messages.map((m) => {
       const obj = m.toJSON();
-      obj.isMine = obj.senderId === currentUser.id;
+      obj.isMine = String(obj.senderId) === String(currentUser.id);
       return obj;
     });
 
     return res.json(result);
   } catch (err) {
-    // falls wir oben status gesetzt haben, sauber zurückgeben
-    if (err.status) {
-      return res.status(err.status).json({ error: err.message });
-    }
+    if (err.status) return res.status(err.status).json({ error: err.message });
     return next(err);
   }
 }
 
 export async function createMessage(req, res, next) {
   const { roomId } = req.params;
-  const { text } = req.body;
+  const { ciphertext, iv, version } = req.body;
 
-  if (!text || !text.trim()) {
-    return res.status(400).json({ message: 'Text is required' });
+  if (!ciphertext || !iv) {
+    return res.status(400).json({ message: 'ciphertext and iv are required' });
   }
 
   try {
@@ -62,18 +59,17 @@ export async function createMessage(req, res, next) {
 
     const msg = await ChatMessage.create({
       roomId,
-      senderId: currentUser.id, // NICHT aus dem Body
-      text: text.trim(),
+      senderId: currentUser.id,
+      ciphertext,
+      iv,
+      version: version || 'aes-gcm-v1',
     });
 
     const obj = msg.toJSON();
-    obj.isMine = true; // gerade gesendet  immer von mir
-
+    obj.isMine = true;
     return res.status(201).json(obj);
   } catch (err) {
-    if (err.status) {
-      return res.status(err.status).json({ error: err.message });
-    }
+    if (err.status) return res.status(err.status).json({ error: err.message });
     return next(err);
   }
 }

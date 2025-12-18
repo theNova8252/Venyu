@@ -16,10 +16,9 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import eventRoutes from './api/routes/eventRoutes.js';
 import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
 
-import http from 'http';                 
-import { WebSocketServer } from 'ws';    
-import cookie from 'cookie';             
-
+import http from 'http';
+import { WebSocketServer } from 'ws';
+import cookie from 'cookie';
 
 // Modelle
 import User from './model/User.js';
@@ -47,7 +46,7 @@ app.use(
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
-// ---------- Hilfsfunktionen für Matches / Chat ----------
+// ---------- Helpers ----------
 async function getCurrentUser(req) {
   const { at } = req.cookies || {};
   if (!at) {
@@ -56,7 +55,7 @@ async function getCurrentUser(req) {
     throw err;
   }
 
-  const sp = await fetchMe(at); // Spotify /me
+  const sp = await fetchMe(at);
   const user = await User.findOne({ where: { spotifyId: sp.id } });
 
   if (!user) {
@@ -95,8 +94,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
       id: u.id,
       userId: u.id,
       name: u.displayName || 'Unknown',
-      avatar:
-        u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
+      avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
       bio: u.bio || 'Music lover 🎵',
       distance: 'Nearby',
       topArtists: [],
@@ -106,9 +104,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
 
     return res.json(result);
   } catch (e) {
-    if (e.status) {
-      return res.status(e.status).json({ error: e.message });
-    }
+    if (e.status) return res.status(e.status).json({ error: e.message });
     next(e);
   }
 });
@@ -119,32 +115,18 @@ app.post('/api/matches/:otherUserId/like', async (req, res, next) => {
     const me = await getCurrentUser(req);
     const { otherUserId } = req.params;
 
-    if (!otherUserId) {
-      return res.status(400).json({ error: 'missing_other_user_id' });
-    }
-    if (otherUserId === String(me.id)) {
-      return res.status(400).json({ error: 'cannot_like_self' });
-    }
+    if (!otherUserId) return res.status(400).json({ error: 'missing_other_user_id' });
+    if (otherUserId === String(me.id)) return res.status(400).json({ error: 'cannot_like_self' });
 
     const other = await User.findByPk(otherUserId);
-    if (!other) {
-      return res.status(404).json({ error: 'user_not_found' });
-    }
+    if (!other) return res.status(404).json({ error: 'user_not_found' });
 
-    // Like eintragen
     await Like.findOrCreate({
-      where: {
-        fromUserId: me.id,
-        toUserId: otherUserId,
-      },
+      where: { fromUserId: me.id, toUserId: otherUserId },
     });
 
-    // Hat der andere dich auch schon geliked?
     const reciprocal = await Like.findOne({
-      where: {
-        fromUserId: otherUserId,
-        toUserId: me.id,
-      },
+      where: { fromUserId: otherUserId, toUserId: me.id },
     });
 
     if (reciprocal) {
@@ -154,9 +136,7 @@ app.post('/api/matches/:otherUserId/like', async (req, res, next) => {
 
     return res.json({ isMatch: false });
   } catch (e) {
-    if (e.status) {
-      return res.status(e.status).json({ error: e.message });
-    }
+    if (e.status) return res.status(e.status).json({ error: e.message });
     next(e);
   }
 });
@@ -166,34 +146,23 @@ app.get('/api/chat/rooms', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
 
-    // Likes, die ich gegeben habe
-    const iLiked = await Like.findAll({
-      where: { fromUserId: me.id }
-    });
+    const iLiked = await Like.findAll({ where: { fromUserId: me.id } });
+    const likedMe = await Like.findAll({ where: { toUserId: me.id } });
 
-    // Likes, die ich bekommen habe
-    const likedMe = await Like.findAll({
-      where: { toUserId: me.id }
-    });
-
-    // Finde Matches ( beide Richtungen existieren )
     const matches = iLiked
-      .filter(l1 => likedMe.some(l2 => l2.fromUserId === l1.toUserId))
-      .map(m => m.toUserId);
+      .filter((l1) => likedMe.some((l2) => l2.fromUserId === l1.toUserId))
+      .map((m) => m.toUserId);
 
-    // Hole Userdaten
-    const users = await User.findAll({
-      where: { id: matches }
-    });
+    const users = await User.findAll({ where: { id: matches } });
 
-    const result = users.map(u => ({
-      roomId: [u.id, me.id].sort().join("__"),
+    const result = users.map((u) => ({
+      roomId: [u.id, me.id].sort().join('__'),
       user: {
         id: u.id,
-        name: u.displayName || "Unknown",
-        avatar: u.avatarUrl || "https://i.pravatar.cc/150?u=" + u.id,
-        bio: u.bio || ""
-      }
+        name: u.displayName || 'Unknown',
+        avatar: u.avatarUrl || 'https://i.pravatar.cc/150?u=' + u.id,
+        bio: u.bio || '',
+      },
     }));
 
     return res.json(result);
@@ -212,8 +181,8 @@ app.use(errorHandler);
 const PORT = Number(process.env.PORT) || 5000;
 
 // ---- WebSocket Raumverwaltung ----
-const rooms = new Map();           // roomId -> Set<WebSocket>
-const onlineUsers = new Map();     // userId -> Anzahl Verbindungen
+const rooms = new Map(); // roomId -> Set<WebSocket>
+const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
 
 function addClientToRoom(roomId, ws) {
   let set = rooms.get(roomId);
@@ -228,43 +197,23 @@ function removeClientFromRoom(roomId, ws) {
   const set = rooms.get(roomId);
   if (!set) return;
   set.delete(ws);
-  if (!set.size) {
-    rooms.delete(roomId);
-  }
+  if (!set.size) rooms.delete(roomId);
 }
 
-function broadcastToRoom(roomId, messageObj, senderWs) {
+function broadcastToRoom(roomId, payload) {
   const set = rooms.get(roomId);
   if (!set) return;
 
   for (const client of set) {
     if (client.readyState !== client.OPEN) continue;
-
-    const msgForClient = {
-      ...messageObj,
-      isMine: client === senderWs || client.userId === messageObj.senderId,
-    };
-
-    client.send(
-      JSON.stringify({
-        type: 'chat_message',
-        message: msgForClient,
-      }),
-    );
+    client.send(JSON.stringify(payload));
   }
 }
 
 function broadcastPresenceUpdate(userId, isOnline, wss) {
-  const payload = JSON.stringify({
-    type: 'presence',
-    userId,
-    isOnline,
-  });
-
+  const payload = JSON.stringify({ type: 'presence', userId, isOnline });
   for (const client of wss.clients) {
-    if (client.readyState === client.OPEN) {
-      client.send(payload);
-    }
+    if (client.readyState === client.OPEN) client.send(payload);
   }
 }
 
@@ -274,8 +223,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
     await initDb();
 
     const server = http.createServer(app);
-
-    // *** EIN gemeinsamer WebSocketServer ***
     const wss = new WebSocketServer({ server });
 
     wss.on('connection', async (ws, req) => {
@@ -283,7 +230,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
         const url = new URL(req.url, `http://${req.headers.host}`);
         const pathname = url.pathname;
 
-        // ----------------- CHAT -----------------
+        // ----------------- CHAT (E2EE) -----------------
         if (pathname === '/ws/chat') {
           const roomId = url.searchParams.get('roomId');
           if (!roomId) {
@@ -314,28 +261,137 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
           ws.on('message', async (data) => {
             try {
               const msg = JSON.parse(data.toString());
-              if (msg.type !== 'chat_message') return;
 
-              const text = (msg.text || '').trim();
-              if (!text) return;
+              // Key exchange: relay only
+              if (msg.type === 'key_exchange') {
+                broadcastToRoom(roomId, {
+                  type: 'key_exchange',
+                  fromUserId: ws.userId,
+                  publicKeyJwk: msg.publicKeyJwk,
+                });
+                return;
+              }
 
-              const saved = await ChatMessage.create({
-                roomId,
-                senderId: ws.userId,
-                text,
-              });
+              // typing indicator
+              if (msg.type === 'typing') {
+                broadcastToRoom(roomId, {
+                  type: 'typing',
+                  fromUserId: ws.userId,
+                  isTyping: !!msg.isTyping,
+                });
+                return;
+              }
 
-              const obj = saved.toJSON();
-              broadcastToRoom(roomId, obj, ws);
+              // read receipt
+              if (msg.type === 'read') {
+                broadcastToRoom(roomId, {
+                  type: 'read',
+                  fromUserId: ws.userId,
+                  lastReadMessageId: msg.lastReadMessageId || null,
+                });
+                return;
+              }
+
+              // encrypted message
+              if (msg.type === 'chat_message') {
+                const { ciphertext, iv, version } = msg;
+                if (!ciphertext || !iv) return;
+
+                const saved = await ChatMessage.create({
+                  roomId,
+                  senderId: ws.userId,
+                  ciphertext,
+                  iv,
+                  version: version || 'aes-gcm-v1',
+                });
+
+                const obj = saved.toJSON();
+
+                broadcastToRoom(roomId, {
+                  type: 'chat_message',
+                  message: obj,
+                });
+                return;
+              }
             } catch (err) {
               console.error('WS chat message error', err);
             }
           });
 
           ws.on('close', () => {
-            console.log(
-              `WS closed (chat): user ${ws.userId} room ${ws.roomId}`,
-            );
+            console.log(`WS closed (chat): user ${ws.userId} room ${ws.roomId}`);
+            removeClientFromRoom(ws.roomId, ws);
+          });
+
+          return;
+        }
+
+        // ----------------- SPOTIFY SYNC -----------------
+        if (pathname === '/ws/spotify') {
+          const roomId = url.searchParams.get('roomId');
+          if (!roomId) {
+            ws.close(1008, 'Missing roomId');
+            return;
+          }
+
+          const cookies = cookie.parse(req.headers.cookie || '');
+          const at = cookies.at;
+          if (!at) {
+            ws.close(1008, 'No auth cookie');
+            return;
+          }
+
+          const sp = await fetchMe(at);
+          const user = await User.findOne({ where: { spotifyId: sp.id } });
+          if (!user) {
+            ws.close(1008, 'user_not_found');
+            return;
+          }
+
+          ws.userId = user.id;
+          ws.roomId = roomId;
+
+          addClientToRoom(roomId, ws);
+          console.log(`WS connected (spotify): user ${user.id} room ${roomId}`);
+
+          ws.on('message', (data) => {
+            try {
+              const msg = JSON.parse(data.toString());
+
+              // time sync ping/pong
+              if (msg.type === 'time_ping') {
+                ws.send(
+                  JSON.stringify({
+                    type: 'time_pong',
+                    clientSentAt: msg.clientSentAt,
+                    serverNow: Date.now(),
+                  }),
+                );
+                return;
+              }
+
+              // host triggers synced start
+              if (msg.type === 'spotify_start') {
+                const { trackUri, countdownMs = 3000 } = msg;
+                if (!trackUri) return;
+
+                const startAt = Date.now() + Number(countdownMs);
+
+                broadcastToRoom(roomId, {
+                  type: 'spotify_sync_start',
+                  trackUri,
+                  startAt,
+                  hostId: ws.userId,
+                });
+                return;
+              }
+            } catch (e) {
+              console.error('WS spotify error', e);
+            }
+          });
+
+          ws.on('close', () => {
+            console.log(`WS closed (spotify): user ${ws.userId} room ${ws.roomId}`);
             removeClientFromRoom(ws.roomId, ws);
           });
 
@@ -363,9 +419,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
           const currentCount = onlineUsers.get(user.id) || 0;
           onlineUsers.set(user.id, currentCount + 1);
 
-          console.log('Presence WS connected:', user.id);
-
-          // Snapshot aller aktuell online User
           ws.send(
             JSON.stringify({
               type: 'presence_snapshot',
@@ -373,7 +426,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
             }),
           );
 
-          // allen sagen: dieser User ist online
           broadcastPresenceUpdate(user.id, true, wss);
 
           ws.on('close', () => {
@@ -382,7 +434,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
 
             if (next <= 0) {
               onlineUsers.delete(user.id);
-              console.log('Presence WS offline:', user.id);
               broadcastPresenceUpdate(user.id, false, wss);
             } else {
               onlineUsers.set(user.id, next);
@@ -392,7 +443,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
           return;
         }
 
-        // Unbekannter Pfad
+        // Unknown WS path
         ws.close(1008, 'Unknown WebSocket path');
       } catch (err) {
         console.error('WS connection error', err);
@@ -407,47 +458,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss) {
     console.error('Failed to init DB:', err);
     process.exit(1);
   }
-  // === Chat: Liste meiner Matches / Chat-Räume ===
-app.get('/api/chat/rooms', async (req, res, next) => {
-  try {
-    const me = await getCurrentUser(req);
-
-    // Likes, die ich gegeben habe
-    const iLiked = await Like.findAll({
-      where: { fromUserId: me.id }
-    });
-
-    // Likes, die ich bekommen habe
-    const likedMe = await Like.findAll({
-      where: { toUserId: me.id }
-    });
-
-    // Finde Matches (beide Richtungen existieren)
-    const matches = iLiked
-      .filter(l1 => likedMe.some(l2 => l2.fromUserId === l1.toUserId))
-      .map(m => m.toUserId);
-
-    // Daten der Match-User holen
-    const users = await User.findAll({
-      where: { id: matches }
-    });
-
-    const result = users.map(u => ({
-      roomId: [u.id, me.id].sort().join("__"),
-      user: {
-        id: u.id,
-        name: u.displayName || "Unknown",
-        avatar: u.avatarUrl || "https://i.pravatar.cc/150?u=" + u.id,
-        bio: u.bio || ""
-      }
-    }));
-
-    return res.json(result);
-  } catch (e) {
-    next(e);
-  }
-});
 })();
 
 export default app;
-

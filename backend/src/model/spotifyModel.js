@@ -12,8 +12,14 @@ const SCOPES = [
   'user-read-private',
   'user-top-read',
   'playlist-read-private',
+<<<<<<< Updated upstream
   'user-read-currently-playing',
   'user-read-playback-state',
+=======
+
+  'user-read-playback-state',
+  'user-modify-playback-state',
+>>>>>>> Stashed changes
 ].join(' ');
 
 // -------- Helpers --------
@@ -21,6 +27,7 @@ function basicAuthHeader() {
   const b64 = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
   return `Basic ${b64}`;
 }
+
 async function spotifyGet(accessToken, path, params = {}) {
   const url = new URL(`https://api.spotify.com/v1${path}`);
   Object.entries(params).forEach(([k, v]) => {
@@ -37,14 +44,6 @@ async function spotifyGet(accessToken, path, params = {}) {
   }
   return res.json();
 }
-export const fetchTopArtists = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/top/artists', { time_range: timeRange, limit });
-
-export const fetchTopTracks = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/top/tracks', { time_range: timeRange, limit });
-
-export const fetchPlaylists = (accessToken, { limit = 20 } = {}) =>
-  spotifyGet(accessToken, '/me/playlists', { limit });
 
 async function postToken(params) {
   const res = await fetch(TOKEN_URL, {
@@ -100,6 +99,7 @@ export const fetchMe = async (accessToken) => {
   return res.json();
 };
 
+<<<<<<< Updated upstream
 
 
 // Currently Playing
@@ -119,3 +119,47 @@ export const fetchCurrentlyPlaying = async (accessToken) => {
 
   return res.json();
 };
+=======
+export const fetchTopArtists = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/top/artists', { time_range: timeRange, limit });
+
+export const fetchTopTracks = (accessToken, { timeRange = 'medium_term', limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/top/tracks', { time_range: timeRange, limit });
+
+export const fetchPlaylists = (accessToken, { limit = 20 } = {}) =>
+  spotifyGet(accessToken, '/me/playlists', { limit });
+
+// ✅ playback helpers
+export const fetchDevices = async (accessToken) =>
+  spotifyGet(accessToken, '/me/player/devices');
+
+export const startPlayback = async (
+  accessToken,
+  { deviceId, uris, contextUri, offset, positionMs } = {},
+) => {
+  const url = new URL('https://api.spotify.com/v1/me/player/play');
+  if (deviceId) url.searchParams.set('device_id', deviceId);
+
+  const body = {};
+  if (Array.isArray(uris) && uris.length) body.uris = uris;
+  if (contextUri) body.context_uri = contextUri;
+  if (offset != null) body.offset = offset;
+  if (positionMs != null) body.position_ms = positionMs;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Spotify play failed: ${res.status} ${text}`);
+  }
+
+  return { ok: true };
+};
+>>>>>>> Stashed changes

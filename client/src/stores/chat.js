@@ -1,4 +1,4 @@
-// stores/chat.js
+// client/src/stores/chat.js
 import { defineStore } from "pinia";
 
 export const useChatStore = defineStore("chat", {
@@ -19,6 +19,7 @@ export const useChatStore = defineStore("chat", {
 
         if (!res.ok) {
           console.error("fetchMessages failed", res.status);
+          this.byRoomId[roomId] = [];
           return;
         }
 
@@ -26,37 +27,14 @@ export const useChatStore = defineStore("chat", {
         this.byRoomId[roomId] = Array.isArray(data) ? data : [];
       } catch (e) {
         console.error("fetchMessages error", e);
+        this.byRoomId[roomId] = [];
       } finally {
         this.loading = false;
       }
     },
 
-    async sendMessage(roomId, text) {
-      const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) {
-        console.error("sendMessage failed", res.status);
-        throw new Error("sendMessage failed");
-      }
-
-      const saved = await res.json();
-
-      if (!this.byRoomId[roomId]) {
-        this.byRoomId[roomId] = [];
-      }
-      this.byRoomId[roomId].push(saved);
-
-      return saved;
-    },
     addMessage(roomId, message) {
-      if (!this.byRoomId[roomId]) {
-        this.byRoomId[roomId] = [];
-      }
+      if (!this.byRoomId[roomId]) this.byRoomId[roomId] = [];
       this.byRoomId[roomId].push(message);
     },
   },
