@@ -1,4 +1,3 @@
-// backend/src/app.js
 import express from 'express';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
@@ -185,7 +184,6 @@ const rooms = new Map(); // roomId -> Set<WebSocket>
 const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
 const lastSeenAt = new Map(); // userId -> ISO timestamp (letztes offline)
 
-
 function addClientToRoom(roomId, ws) {
   let set = rooms.get(roomId);
   if (!set) {
@@ -237,7 +235,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
     if (client.readyState === client.OPEN) client.send(payload);
   }
 }
-
 
 // Serverstart + DB-Init + WebSocket
 (async () => {
@@ -451,66 +448,65 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
 
         // --------------- PRESENCE ---------------
         // --------------- PRESENCE ---------------
-if (pathname === '/ws/presence') {
-  const cookies = cookie.parse(req.headers.cookie || '');
-  const at = cookies.at;
-  if (!at) {
-    ws.close(1008, 'No auth cookie');
-    return;
-  }
+        if (pathname === '/ws/presence') {
+          const cookies = cookie.parse(req.headers.cookie || '');
+          const at = cookies.at;
+          if (!at) {
+            ws.close(1008, 'No auth cookie');
+            return;
+          }
 
-  const sp = await fetchMe(at);
-  const user = await User.findOne({ where: { spotifyId: sp.id } });
-  if (!user) {
-    ws.close(1008, 'user_not_found');
-    return;
-  }
+          const sp = await fetchMe(at);
+          const user = await User.findOne({ where: { spotifyId: sp.id } });
+          if (!user) {
+            ws.close(1008, 'user_not_found');
+            return;
+          }
 
-  ws.userId = user.id;
+          ws.userId = user.id;
 
-  // online count erhöhen
-  const currentCount = onlineUsers.get(user.id) || 0;
-  onlineUsers.set(user.id, currentCount + 1);
+          // online count erhöhen
+          const currentCount = onlineUsers.get(user.id) || 0;
+          onlineUsers.set(user.id, currentCount + 1);
 
-  // ✅ Snapshot enthält online users + lastSeen map
-  // lastSeen: { [userId]: iso }
-  const lastSeenObj = {};
-  for (const [uid, iso] of lastSeenAt.entries()) {
-    lastSeenObj[String(uid)] = iso;
-  }
+          // ✅ Snapshot enthält online users + lastSeen map
+          // lastSeen: { [userId]: iso }
+          const lastSeenObj = {};
+          for (const [uid, iso] of lastSeenAt.entries()) {
+            lastSeenObj[String(uid)] = iso;
+          }
 
-  ws.send(
-    JSON.stringify({
-      type: 'presence_snapshot',
-      users: Array.from(onlineUsers.keys()).map(String),
-      lastSeen: lastSeenObj,
-    }),
-  );
+          ws.send(
+            JSON.stringify({
+              type: 'presence_snapshot',
+              users: Array.from(onlineUsers.keys()).map(String),
+              lastSeen: lastSeenObj,
+            }),
+          );
 
-  // ✅ Online broadcast
-  broadcastPresenceUpdate(String(user.id), true, wss);
+          // ✅ Online broadcast
+          broadcastPresenceUpdate(String(user.id), true, wss);
 
-  ws.on('close', () => {
-    const prev = onlineUsers.get(user.id) || 1;
-    const next = prev - 1;
+          ws.on('close', () => {
+            const prev = onlineUsers.get(user.id) || 1;
+            const next = prev - 1;
 
-    if (next <= 0) {
-      onlineUsers.delete(user.id);
+            if (next <= 0) {
+              onlineUsers.delete(user.id);
 
-      // ✅ lastSeen timestamp setzen (offline seit jetzt)
-      const iso = new Date().toISOString();
-      lastSeenAt.set(String(user.id), iso);
+              // ✅ lastSeen timestamp setzen (offline seit jetzt)
+              const iso = new Date().toISOString();
+              lastSeenAt.set(String(user.id), iso);
 
-      // ✅ Offline broadcast mit lastSeenAt
-      broadcastPresenceUpdate(String(user.id), false, wss, { lastSeenAt: iso });
-    } else {
-      onlineUsers.set(user.id, next);
-    }
-  });
+              // ✅ Offline broadcast mit lastSeenAt
+              broadcastPresenceUpdate(String(user.id), false, wss, { lastSeenAt: iso });
+            } else {
+              onlineUsers.set(user.id, next);
+            }
+          });
 
-  return;
-}
-
+          return;
+        }
 
         // Unknown WS path
         ws.close(1008, 'Unknown WebSocket path');
