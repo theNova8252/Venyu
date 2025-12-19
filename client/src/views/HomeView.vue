@@ -123,6 +123,49 @@
       <section class="main-grid q-mt-xl">
         <!-- Left -->
         <div class="col-left">
+          <!-- Recently Played -->
+          <div class="glass q-pa-lg content-card">
+            <div class="card-head">
+              <div class="head-left">
+                <div class="head-icon grad-green">
+                  <q-icon name="history" size="20px" />
+                </div>
+                <h3>Recently Played</h3>
+              </div>
+              <q-btn flat round dense icon="refresh" size="sm" @click="fetchRecentlyPlayed" />
+            </div>
+
+            <div v-if="loadingRecent" class="q-gutter-sm">
+              <q-skeleton v-for="i in 5" :key="i" height="56px" />
+            </div>
+
+            <div v-else class="list">
+              <div v-for="(item, idx) in recentlyPlayed" :key="idx" class="list-row track-row">
+                <q-avatar size="48px" class="track-cover">
+                  <img v-if="item.track.album.image" :src="item.track.album.image" />
+                  <div v-else class="initials small">
+                    {{ (item.track.name || '?')[0] }}
+                  </div>
+                </q-avatar>
+
+                <div class="col">
+                  <div class="track-name">{{ item.track.name }}</div>
+                  <div class="muted">
+                    {{item.track.artists.map(a => a.name).join(', ')}}
+                  </div>
+                </div>
+                <div class="track-time muted">
+                  {{ formatPlayedAt(item.playedAt) }}
+                </div>
+
+                <q-btn flat round icon="play_arrow" size="sm" @click="playTrack(item.track.uri)" />
+              </div>
+
+              <div v-if="!recentlyPlayed.length" class="empty">
+                No recent plays found. Start listening on Spotify!
+              </div>
+            </div>
+          </div>
           <!-- Top Artists -->
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
@@ -194,17 +237,79 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
+                <div class="head-icon grad-orange">
+                  <q-icon name="event_available" size="20px" />
+                </div>
+                <h3>My Events</h3>
+              </div>
+            </div>
+            <div v-if="loadingEvents" class="q-gutter-sm">
+              <q-skeleton v-for="i in 3" :key="i" height="64px" />
+            </div>
+            <div v-else>
+              <!-- Interested -->
+              <div v-if="interestedEvents.length" class="event-section">
+                <div class="section-label">
+                  <q-icon name="star" size="16px" color="pink-6" />
+                  <span>Interested ({{ interestedEvents.length }})</span>
+                </div>
+                <div class="list">
+                  <div v-for="e in interestedEvents" :key="e.id" class="event-row small">
+                    <div class="event-date">
+                      <div class="month">{{ formatEventMonth(e.date) }}</div>
+                      <div class="day">{{ formatEventDay(e.date) }}</div>
+                    </div>
+                    <div class="col">
+                      <div class="event-title">{{ e.title }}</div>
+                      <div class="muted">
+                        <q-icon name="place" size="14px" />
+                        {{ e.city }}
+                      </div>
+                    </div>
+                    <q-btn flat round icon="close" size="sm" @click="events.toggleInterested(e.id)" />
+                  </div>
+                </div>
+              </div>
+              <div v-if="goingEvents.length" class="event-section q-mt-md">
+                <div class="section-label">
+                  <q-icon name="check_circle" size="16px" color="purple-6" />
+                  <span>Going ({{ goingEvents.length }})</span>
+                </div>
+                <div class="list">
+                  <div v-for="e in goingEvents" :key="e.id" class="event-row small">
+                    <div class="event-date">
+                      <div class="month">{{ formatEventMonth(e.date) }}</div>
+                      <div class="day">{{ formatEventDay(e.date) }}</div>
+                    </div>
+                    <div class="col">
+                      <div class="event-title">{{ e.title }}</div>
+                      <div class="muted">
+                        <q-icon name="place" size="14px" />
+                        {{ e.city }}
+                      </div>
+                    </div>
+                    <q-btn flat round icon="close" size="sm" @click="events.toggleGoing(e.id)" />
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="!interestedEvents.length && !goingEvents.length" class="empty">
+                Mark events as interested or going on the map!
+              </div>
+            </div>
+          </div>
+          <div class="glass q-pa-lg content-card">
+            <div class="card-head">
+              <div class="head-left">
                 <div class="head-icon grad-pink">
                   <q-icon name="people" size="20px" />
                 </div>
-                <h3>Your Matches</h3>
+                <h3>My Matches</h3>
               </div>
-
-              <q-btn flat round dense icon="refresh" size="sm" @click="matches.fetchMatches()" />
             </div>
 
             <div v-if="loadingMatches" class="q-gutter-sm">
-              <q-skeleton v-for="i in 4" :key="i" height="64px" />
+              <q-skeleton v-for="i in 3" :key="i" height="64px" />
             </div>
 
             <div v-else class="list">
@@ -288,6 +393,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useMatchesStore } from '@/stores/matches';
 import { useEventsStore } from '@/stores/events';
+import axios from 'axios';
 
 const user = useUserStore();
 const matches = useMatchesStore();
@@ -296,6 +402,7 @@ const events = useEventsStore();
 const loadingMe = ref(true);
 const loadingMatches = ref(true);
 const loadingEvents = ref(true);
+const loadingRecent = ref(false);
 
 const displayName = computed(() => {
   return (
@@ -352,8 +459,43 @@ const formatNumber = (n) => {
   if (!n && n !== 0) return "—";
   return Intl.NumberFormat("en-US", { notation: "compact" }).format(n);
 };
+const recentlyPlayed = computed(() => user.me?.recentlyPlayed || []);
 
+const interestedEvents = computed(() => {
+  return events.list.filter(e => events.getRsvp(e.id)?.interested);
+});
 
+const goingEvents = computed(() => {
+  return events.list.filter(e => events.getRsvp(e.id)?.going);
+});
+
+const fetchRecentlyPlayed = async () => {
+  loadingRecent.value = true;
+  await user.fetchMe(); // Refresh user data which includes recently played
+  loadingRecent.value = false;
+};
+
+const playTrack = async (trackUri) => {
+  try {
+    await axios.post('/api/spotify/player/play', { trackUri });
+  } catch (error) {
+    console.error('Error playing track:', error);
+  }
+};
+
+const formatPlayedAt = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
 onMounted(async () => {
   if (!user.me) await user.fetchMe();
   if (!matches.list.length) await matches.fetchMatches();
@@ -643,7 +785,12 @@ onMounted(async () => {
 .grad-purple {
   background: linear-gradient(135deg, #7c5cff, #a855f7);
 }
-
+.grad-green {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+.grad-orange {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
 .grad-pink {
   background: linear-gradient(135deg, #ec4899, #ef4444);
 }
@@ -656,6 +803,30 @@ onMounted(async () => {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 800;
+}
+.track-row {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.track-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(4px);
+}
+
+.track-cover {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.track-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.track-time {
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 /* Lists */
@@ -693,7 +864,34 @@ onMounted(async () => {
 .verified {
   color: #c084fc;
 }
+.event-section {
+  margin-bottom: 1rem;
+}
 
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.5rem;
+}
+
+.event-row.small {
+  padding: 0.6rem 0.8rem;
+}
+
+.event-row.small .event-date {
+  width: 48px;
+  height: 48px;
+}
+
+.event-row.small .event-title {
+  font-size: 0.9rem;
+}
 .match-row,
 .event-row {
   display: flex;

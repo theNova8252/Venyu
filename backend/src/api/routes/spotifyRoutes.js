@@ -30,7 +30,6 @@ router.post('/auth/refresh', refresh);
 router.get('/me', me);
 router.post('/auth/logout', logout);
 
-
 router.get('/player/devices', devices);
 router.post('/player/play', play);
 

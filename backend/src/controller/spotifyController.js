@@ -7,6 +7,7 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
+  fetchRecentlyPlayed,
   fetchDevices,
   startPlayback,
 } from '../model/spotifyModel.js';
@@ -38,10 +39,11 @@ export const callback = async (req, res) => {
 
     const tokens = await exchangeCodeForTokens(code);
 
-    const [meProfile, topArtistsRes, topTracksRes] = await Promise.all([
+    const [meProfile, topArtistsRes, topTracksRes, recentlyPlayedRes] = await Promise.all([
       fetchMe(tokens.access_token),
-      fetchTopArtists(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
-      fetchTopTracks(tokens.access_token, { time_range: 'medium_term', limit: 20 }),
+      fetchTopArtists(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
+      fetchTopTracks(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
+      fetchRecentlyPlayed(tokens.access_token, { limit: 20 }),
     ]);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
@@ -74,6 +76,24 @@ export const callback = async (req, res) => {
         uri: a.uri,
       })),
     }));
+    const recentlyPlayed = (recentlyPlayedRes?.items || []).map((item) => ({
+      playedAt: item.played_at,
+      track: {
+        id: item.track.id,
+        name: item.track.name,
+        uri: item.track.uri,
+        previewUrl: item.track.preview_url,
+        album: {
+          id: item.track.album?.id,
+          name: item.track.album?.name,
+          image: item.track.album?.images?.[0]?.url ?? null,
+        },
+        artists: (item.track.artists || []).map((a) => ({
+          id: a.id,
+          name: a.name,
+        })),
+      },
+    }));
 
     const genresSet = new Set();
     topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
@@ -92,6 +112,7 @@ export const callback = async (req, res) => {
       tokenExpiresAt: expiresAt,
       topArtists,
       topTracks,
+      recentlyPlayed,
       genres,
     };
 
@@ -152,6 +173,7 @@ export const me = async (req, res, next) => {
       product: user.product,
       topArtists: user.topArtists,
       topTracks: user.topTracks,
+      recentlyPlayed: user.recentlyPlayed,
       genres: user.genres,
     });
   } catch (e) {

@@ -52,6 +52,7 @@ export function buildAuthUrl(state = '') {
       'user-read-private',
       'user-top-read',
       'user-read-playback-state',
+      'user-read-recently-played',
       'user-modify-playback-state',
       'streaming',
     ].join(' '),
@@ -110,18 +111,21 @@ export async function fetchMe(accessToken) {
   return spotifyFetch(`${SPOTIFY_API}/me`, accessToken);
 }
 
-export async function fetchTopArtists(accessToken, { time_range = 'medium_term', limit = 20 } = {}) {
-  const qs = new URLSearchParams({ time_range, limit: String(limit) });
+export async function fetchTopArtists(accessToken, { timeRange = 'medium_term', limit = 20 } = {}) {
+  const qs = new URLSearchParams({ time_range: timeRange, limit: String(limit) });
   return spotifyFetch(`${SPOTIFY_API}/me/top/artists?${qs.toString()}`, accessToken);
 }
 
-export async function fetchTopTracks(accessToken, { time_range = 'medium_term', limit = 20 } = {}) {
-  const qs = new URLSearchParams({ time_range, limit: String(limit) });
+export async function fetchTopTracks(accessToken, { timeRange = 'medium_term', limit = 20 } = {}) {
+  const qs = new URLSearchParams({ time_range: timeRange, limit: String(limit) });
   return spotifyFetch(`${SPOTIFY_API}/me/top/tracks?${qs.toString()}`, accessToken);
 }
-
+// ================= RECENTLY PLAYED =================
+export async function fetchRecentlyPlayed(accessToken, { limit = 20 } = {}) {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  return spotifyFetch(`${SPOTIFY_API}/me/player/recently-played?${qs.toString()}`, accessToken);
+}
 // ================= CURRENTLY PLAYING =================
-
 
 // ================= DEVICES / PLAYBACK =================
 export async function fetchDevices(accessToken) {
