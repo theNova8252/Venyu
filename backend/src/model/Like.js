@@ -21,11 +21,17 @@ Like.init(
       field: 'to_user_id',
     },
   },
-  {
+    {
     sequelize,
     modelName: 'Like',
     tableName: 'likes',
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['from_user_id', 'to_user_id'],
+      },
+    ],
   },
 );
 

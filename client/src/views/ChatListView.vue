@@ -28,7 +28,16 @@
           </q-item-label>
 
           <q-item-label caption>
-            {{ c.user.bio }}
+            <span v-if="isUserOnline(c.user.id)">Online</span>
+            <span v-else>
+              Offline {{ offlineSinceText(c.user.id) }}
+              <span v-if="offlineSinceDateTime(c.user.id)" class="q-ml-sm">
+                ({{ offlineSinceDateTime(c.user.id) }})
+              </span>
+            </span>
+
+            <span class="q-ml-sm text-grey-6">·</span>
+            <span class="q-ml-sm">{{ c.user.bio }}</span>
           </q-item-label>
         </q-item-section>
 
@@ -59,6 +68,8 @@ const list = computed(() => chats.list);
 const loading = computed(() => chats.loading);
 
 const isUserOnline = (userId) => presenceStore.isOnline(userId);
+const offlineSinceText = (userId) => presenceStore.offlineSinceText(userId);
+const offlineSinceDateTime = (userId) => presenceStore.offlineSinceDateTime(userId);
 
 function openChat(roomId) {
   router.push({ name: "ChatView", params: { roomId } });

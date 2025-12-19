@@ -4,28 +4,10 @@
       <q-btn flat round dense icon="arrow_back" @click="$router.back()" />
       <div class="q-ml-md">
         <div class="text-subtitle1">Chat</div>
-
         <div class="text-caption" :class="otherIsOnline ? 'text-positive' : 'text-grey-6'">
           {{ otherIsOnline ? "Online" : "Offline" }}
         </div>
-
         <div v-if="otherTyping" class="text-caption text-grey-6">tippt...</div>
-
-        <div v-if="countdownText" class="text-caption text-primary q-mt-xs">
-          {{ countdownText }}
-        </div>
-
-        <q-btn
-          class="q-mt-sm"
-          size="sm"
-          outline
-          :disable="!topTrack"
-          :label="topTrack ? `Sync: ${topTrack.name}` : 'Kein Track verfügbar'"
-          @click="topTrack && startSyncedSong(topTrack.uri, 3000)"
-        />
-        <div v-if="topTrack" class="text-caption text-grey-7 q-mt-xs">
-          {{ topTrack.name }} – {{ topTrack.artists.map(a => a.name).join(', ') }}
-        </div>
       </div>
     </div>
 
@@ -62,7 +44,7 @@
         dense
         placeholder="Nachricht schreiben..."
         :disable="sending"
-        @keyup.enter="onSend"
+        @keydown.enter.prevent="onSend"
         @update:model-value="onTyping"
       />
       <q-btn
@@ -71,7 +53,7 @@
         color="primary"
         :loading="sending"
         :disable="!draft.trim()"
-        @click.stop="onSend"
+        @click="onSend"
       />
     </div>
   </q-page>
@@ -85,7 +67,7 @@ import { useAuthStore } from "@/stores/auth";
 import { usePresenceStore } from "@/stores/active";
 
 import {
-  generateIdentity,
+  getOrCreateIdentity,
   exportPublicJwk,
   importRemotePublicJwk,
   deriveAesKey,
@@ -93,14 +75,10 @@ import {
   decryptText,
 } from "@/api/e2ee";
 
-import { makeSpotifyWs, measureServerOffset, spotifyPlay } from "@/api/spotifySync";
-
 const route = useRoute();
 const chatStore = useChatStore();
 const authStore = useAuthStore();
 const presenceStore = usePresenceStore();
-
-const topTrack = computed(() => authStore.user?.topTracks?.[0] || null);
 
 const roomId = computed(() => route.params.roomId);
 const messages = computed(() => chatStore.messages(roomId.value));
@@ -108,20 +86,13 @@ const loading = computed(() => chatStore.loading);
 
 const draft = ref("");
 const sending = ref(false);
-
 const otherTyping = ref(false);
-const countdownText = ref("");
 
 let socket = null;
 
 // E2EE
 let myKeyPair = null;
 let aesKey = null;
-let sentMyPubWs = false;
-
-// Spotify sync WS
-let spotifySocket = null;
-let serverOffsetMs = 0;
 
 const currentUserId = computed(() => authStore.user?.id ?? null);
 
@@ -131,12 +102,9 @@ const otherUserId = computed(() => {
 
   const parts = String(r).split("__");
   const me = currentUserId.value ? String(currentUserId.value) : null;
+  if (!me) return parts[0] || null;
 
-  if (me) {
-    const other = parts.find((p) => p !== me);
-    return other || parts[0] || null;
-  }
-  return parts[0] || null;
+  return parts.find((p) => p !== me) || null;
 });
 
 const otherIsOnline = computed(() =>
@@ -148,6 +116,7 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// ✅ retry decrypt + setzt readByOther aus DB (readAt)
 async function decryptAllLoadedMessages() {
   if (!aesKey) return;
 
@@ -155,18 +124,20 @@ async function decryptAllLoadedMessages() {
   for (const m of arr) {
     m.isMine = String(m.senderId) === String(currentUserId.value);
 
-    // readByOther aus DB-Feldern ableiten, falls vorhanden
+    // ✅ wichtig fürs ✓✓: wenn ich Sender bin und readAt existiert => gelesen
     if (m.isMine) {
       m.readByOther = !!m.readAt;
-    } else {
-      m.readByOther = false;
     }
 
-    if ((!m.text || m.text === "🔒 (Key wird noch ausgehandelt...)") && m.ciphertext && m.iv) {
+    if (m.ciphertext && m.iv) {
+      if (m._decrypted === true) continue;
+
       try {
         m.text = await decryptText(aesKey, m.ciphertext, m.iv);
+        m._decrypted = true;
       } catch {
         m.text = "🔒 (Entschlüsselung fehlgeschlagen)";
+        m._decrypted = false;
       }
     }
   }
@@ -175,30 +146,33 @@ async function decryptAllLoadedMessages() {
 async function fetchMessages() {
   await chatStore.fetchMessages(roomId.value, currentUserId.value);
   await decryptAllLoadedMessages();
+
+  // ✅ Beim Öffnen: alles bis zur letzten fremden Nachricht als gelesen melden
+  sendReadUpToLastForeignMessage();
 }
 
-/**
- * REST-Key-Setup:
- * 1) generate identity if missing
- * 2) POST my public key to backend
- * 3) GET peer public key from backend
- * 4) derive aesKey
- */
+// ✅ PublicKey Upload nur 1x
 async function ensureE2eeKeyReadyViaRest() {
   if (!currentUserId.value) return;
 
-  if (!myKeyPair) myKeyPair = await generateIdentity();
+  if (!myKeyPair) myKeyPair = await getOrCreateIdentity(currentUserId.value);
 
-  // upsert my pubkey
-  const publicKeyJwk = await exportPublicJwk(myKeyPair);
-  await fetch("/api/chat/e2ee/public-key", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ publicKeyJwk }),
-  }).catch(() => {});
+  const flagKey = `e2ee_pub_uploaded_v1_${currentUserId.value}`;
+  if (!localStorage.getItem(flagKey)) {
+    try {
+      const publicKeyJwk = await exportPublicJwk(myKeyPair);
+      await fetch("/api/chat/e2ee/public-key", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publicKeyJwk }),
+      });
+      localStorage.setItem(flagKey, "1");
+    } catch {
+      // ignore
+    }
+  }
 
-  // try fetch peer key
   try {
     const res = await fetch(`/api/chat/rooms/${encodeURIComponent(roomId.value)}/peer-key`, {
       credentials: "include",
@@ -218,37 +192,24 @@ async function ensureE2eeKeyReadyViaRest() {
 
 async function sendMyPublicKeyWs() {
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
-  if (!myKeyPair) myKeyPair = await generateIdentity();
+  if (!myKeyPair) myKeyPair = await getOrCreateIdentity(currentUserId.value);
 
   const publicKeyJwk = await exportPublicJwk(myKeyPair);
   socket.send(JSON.stringify({ type: "key_exchange", publicKeyJwk }));
 }
 
 function connectChatWebSocket() {
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-    socket.close();
-  }
-
-  aesKey = null;
-  sentMyPubWs = false;
-  otherTyping.value = false;
+  if (socket) socket.close();
 
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   const host = import.meta.env.DEV ? "127.0.0.1:5000" : window.location.host;
-
-  const wsUrl = `${protocol}://${host}/ws/chat?roomId=${encodeURIComponent(roomId.value)}`;
-  socket = new WebSocket(wsUrl);
+  socket = new WebSocket(`${protocol}://${host}/ws/chat?roomId=${encodeURIComponent(roomId.value)}`);
 
   socket.onopen = async () => {
-    if (!myKeyPair) myKeyPair = await generateIdentity();
+    if (!myKeyPair) myKeyPair = await getOrCreateIdentity(currentUserId.value);
+    await sendMyPublicKeyWs();
 
-    // WS handshake (optional)
-    if (!sentMyPubWs) {
-      await sendMyPublicKeyWs();
-      sentMyPubWs = true;
-    }
-
-    // Wenn wir schon Messages geladen haben: mark als read bis zur letzten fremden
+    // ✅ beim Connect ebenfalls readUp senden (für Reload-Fälle)
     sendReadUpToLastForeignMessage();
   };
 
@@ -270,8 +231,8 @@ function connectChatWebSocket() {
         return;
       }
 
+      // ✅ DAS ist der Grund für ✓✓: read event verarbeiten
       if (data.type === "read") {
-        // ✅ now consistent: lastReadMessageId
         chatStore.markReadUpTo(roomId.value, data.lastReadMessageId, currentUserId.value);
         return;
       }
@@ -280,33 +241,41 @@ function connectChatWebSocket() {
         const msg = data.message;
 
         msg.isMine = String(msg.senderId) === String(currentUserId.value);
-        msg.readByOther = false;
+        msg.readByOther = msg.isMine ? !!msg.readAt : false;
 
         if (aesKey && msg.ciphertext && msg.iv) {
           try {
             msg.text = await decryptText(aesKey, msg.ciphertext, msg.iv);
+            msg._decrypted = true;
           } catch {
             msg.text = "🔒 (Entschlüsselung fehlgeschlagen)";
+            msg._decrypted = false;
           }
         } else {
           msg.text = "🔒 (Key wird noch ausgehandelt...)";
+          msg._decrypted = false;
         }
 
         chatStore.addMessage(roomId.value, msg, currentUserId.value);
 
-        // wenn ich was empfange: direkt read receipt senden
-        if (!msg.isMine && socket?.readyState === WebSocket.OPEN) {
-          socket.send(JSON.stringify({ type: "read", lastReadMessageId: msg.id }));
+        // ✅ Wenn ich eine fremde Nachricht sehe: read receipt senden
+        if (!msg.isMine) {
+          sendRead(msg.id);
         }
-        return;
       }
     } catch (e) {
-      console.error("WS message parse error", e);
+      console.error("WS parse error", e);
     }
   };
 
-  socket.onclose = (ev) => console.log("WS closed", ev.code, ev.reason);
-  socket.onerror = (err) => console.error("WS error", err);
+  socket.onclose = () => console.log("WS closed");
+  socket.onerror = (e) => console.error("WS error", e);
+}
+
+function sendRead(messageId) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  if (!messageId) return;
+  socket.send(JSON.stringify({ type: "read", lastReadMessageId: String(messageId) }));
 }
 
 function sendReadUpToLastForeignMessage() {
@@ -314,11 +283,12 @@ function sendReadUpToLastForeignMessage() {
   const arr = chatStore.messages(roomId.value);
   if (!arr?.length) return;
 
-  // letzte Nachricht, die NICHT von mir ist
-  const lastForeign = [...arr].reverse().find((m) => String(m.senderId) !== String(currentUserId.value));
-  if (!lastForeign) return;
+  const lastForeign = [...arr]
+    .reverse()
+    .find((m) => String(m.senderId) !== String(currentUserId.value));
 
-  socket.send(JSON.stringify({ type: "read", lastReadMessageId: lastForeign.id }));
+  if (!lastForeign) return;
+  sendRead(lastForeign.id);
 }
 
 let typingTimer = null;
@@ -331,16 +301,16 @@ function onTyping() {
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "typing", isTyping: false }));
     }
-  }, 800);
+  }, 700);
 }
 
 async function onSend() {
+  if (sending.value) return; // ✅ verhindert doppelt durch Click+Enter
+
   const text = draft.value.trim();
   if (!text) return;
-
   if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
-  // wenn key noch nicht ready: REST attempt + WS attempt
   if (!aesKey) {
     await ensureE2eeKeyReadyViaRest();
     if (!aesKey) {
@@ -360,83 +330,23 @@ async function onSend() {
   }
 }
 
-// Spotify Sync
-async function connectSpotifyWs() {
-  if (spotifySocket && (spotifySocket.readyState === WebSocket.OPEN || spotifySocket.readyState === WebSocket.CONNECTING)) {
-    spotifySocket.close();
-  }
-
-  countdownText.value = "";
-  serverOffsetMs = 0;
-
-  spotifySocket = makeSpotifyWs(roomId.value);
-
-  spotifySocket.onopen = async () => {
-    serverOffsetMs = await measureServerOffset(spotifySocket);
-  };
-
-  spotifySocket.onmessage = async (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data.type === "spotify_sync_start") {
-        const { trackUri, startAt } = data;
-
-        const now = Date.now() + serverOffsetMs;
-        const msUntil = Math.max(0, startAt - now);
-
-        const startedAt = Date.now();
-        const tick = () => {
-          const elapsed = Date.now() - startedAt;
-          const left = Math.max(0, msUntil - elapsed);
-          countdownText.value = left > 0 ? `Start in ${(left / 1000).toFixed(1)}s` : "";
-          if (left > 0) requestAnimationFrame(tick);
-        };
-        tick();
-
-        setTimeout(async () => {
-          try {
-            await spotifyPlay(trackUri);
-            countdownText.value = "";
-          } catch (e) {
-            console.error(e);
-            countdownText.value = "";
-          }
-        }, msUntil);
-      }
-    } catch (e) {
-      console.error("spotify ws parse error", e);
-    }
-  };
-}
-
-function startSyncedSong(trackUri, countdownMs = 3000) {
-  if (!spotifySocket || spotifySocket.readyState !== WebSocket.OPEN) return;
-  spotifySocket.send(JSON.stringify({ type: "spotify_start", trackUri, countdownMs }));
-}
-
 onMounted(async () => {
   await authStore.fetchMe();
   presenceStore.connect();
 
   await fetchMessages();
-
-  // ✅ E2EE: setup via REST (damit Verschlüsselung auch ohne live peer klappt)
   await ensureE2eeKeyReadyViaRest();
-
   connectChatWebSocket();
-  await connectSpotifyWs();
 });
 
 watch(roomId, async () => {
   await fetchMessages();
   await ensureE2eeKeyReadyViaRest();
   connectChatWebSocket();
-  await connectSpotifyWs();
 });
 
 onUnmounted(() => {
   if (socket) socket.close();
-  if (spotifySocket) spotifySocket.close();
 });
 </script>
 
@@ -444,4 +354,13 @@ onUnmounted(() => {
 .chat-page { height: 100vh; }
 .chat-messages { background: #ffffff; }
 .self-message { display: flex; justify-content: flex-end; }
+.bubble {
+  max-width: 75%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #eaeaea;
+}
+.self-message .bubble {
+  background: #cfe9ff;
+}
 </style>
