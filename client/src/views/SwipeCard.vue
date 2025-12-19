@@ -17,7 +17,7 @@
           </div>
         </div>
       </div>
-
+    </div>
       <!-- No More Cards Message -->
       <transition name="fade">
         <div v-if="currentCardIndex >= cards.length" class="no-cards-container">
@@ -111,39 +111,10 @@
                   {{ genre }}
                 </div>
               </div>
-
-              <!--currently playing-->
-
-              <div
-                v-if="card.currentlyPlaying?.isPlaying"
-                class="music-section now-playing"
-              >
-                <div class="music-header">
-                  <q-icon name="headphones" size="20px" color="green-5" />
-                  <span class="music-title">Currently Playing</span>
-                </div>
-
-                <div class="now-playing-row">
-                  <img
-                    v-if="card.currentlyPlaying.track?.albumImage"
-                    :src="card.currentlyPlaying.track.albumImage"
-                    class="now-playing-cover"
-                  />
-
-                  <div class="now-playing-info">
-                    <div class="track">
-                      {{ card.currentlyPlaying.track.name }}
-                    </div>
-                    <div class="artist">
-                      {{ card.currentlyPlaying.track.artists.join(" · ") }}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
-          </div>
-        </div>
       </div>
+      
 
       <!-- Action Buttons -->
       <div v-if="currentCardIndex < cards.length" class="action-buttons">
@@ -265,8 +236,7 @@ const cards = computed(() =>
       (m.distanceKm != null ? `${m.distanceKm} km away` : "Nearby"),
     topArtists: m.topArtists ?? m.spotifyTopArtists ?? [],
     genres: m.genres ?? m.spotifyGenres ?? [],
-    matchScore: m.matchScore ?? m.compatibility ?? 90,
-    currentlyPlaying: m.currentlyPlaying ?? null,
+    matchScore: m.score ?? m.machScore ?? m.compatibility ?? 0,
   }))
 );
 
@@ -360,8 +330,6 @@ const sendMessage = () => {
     params: { roomId: currentRoomId.value },
   });
 };
-
-// currentlyPlaying
 
 onMounted(async () => {
   if (!userStore.me) {
@@ -795,35 +763,6 @@ onMounted(async () => {
     width: 100px;
     height: 100px;
   }
-
-  // currently playing
-.now-playing {
-  margin-top: 0.6rem;
-}
-
-.now-playing-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.now-playing-cover {
-  width: 42px;
-  height: 42px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.now-playing-info .track {
-  font-weight: 700;
-  font-size: 0.85rem;
-  color: white;
-}
-
-.now-playing-info .artist {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
-}
 
 }
 </style>

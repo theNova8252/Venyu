@@ -53,7 +53,6 @@ export function buildAuthUrl(state = '') {
       'user-top-read',
       'user-read-playback-state',
       'user-modify-playback-state',
-      'user-read-currently-playing',
       'streaming',
     ].join(' '),
     state,
@@ -122,17 +121,7 @@ export async function fetchTopTracks(accessToken, { time_range = 'medium_term', 
 }
 
 // ================= CURRENTLY PLAYING =================
-export async function fetchCurrentlyPlaying(accessToken) {
-  // Spotify returns 204 if nothing playing
-  const res = await fetch(`${SPOTIFY_API}/me/player/currently-playing`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (res.status === 204) return null;
 
-  const text = await res.text().catch(() => '');
-  if (!res.ok) throw new Error(text || `currently-playing failed ${res.status}`);
-  return text ? JSON.parse(text) : null;
-}
 
 // ================= DEVICES / PLAYBACK =================
 export async function fetchDevices(accessToken) {

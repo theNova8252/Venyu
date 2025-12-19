@@ -16,7 +16,12 @@ export const useMatchesStore = defineStore("matches", {
       try {
         // ✅ Backend liefert Candidates
         const data = await api.getMatches();
-        this.list = Array.isArray(data) ? data : [];
+        this.list = (Array.isArray(data) ? data : []).sort(
+  (a, b) =>
+    (b.score ?? b.matchScore ?? b.compatibility ?? 0) -
+    (a.score ?? a.matchScore ?? a.compatibility ?? 0)
+);
+
       } catch (e) {
         this.error = e?.message || String(e);
         this.list = [];

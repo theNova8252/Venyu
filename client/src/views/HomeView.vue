@@ -219,7 +219,7 @@
                 <div class="col">
                   <div class="match-top">
                     <div class="match-name">{{ m.name || 'Match' }}</div>
-                    <div class="match-score">{{ m.score }}% match</div>
+                    <div class="match-score">{{ m.score ?? m.matchScore ?? m.compability ?? 0 }}% match</div>
                   </div>
                   <div class="muted ellipsis">
                     {{ m.sharedArtists?.join(', ') || 'No shared artists yet' }}

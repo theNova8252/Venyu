@@ -19,17 +19,9 @@ User.init(
     topArtists: { type: DataTypes.JSONB, field: 'top_artists' },
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
     genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
-    shareCurrentlyPlaying: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false,
-      field: 'share_currently_playing',
+    
     },
 
-    currentlyPlaying: {
-      type: DataTypes.JSONB,
-      field: 'currently_playing',
-    },
-  },
   {
     sequelize,
     modelName: 'User',

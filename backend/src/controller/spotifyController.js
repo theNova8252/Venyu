@@ -7,7 +7,6 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
-  fetchCurrentlyPlaying,
   fetchDevices,
   startPlayback,
 } from '../model/spotifyModel.js';
@@ -218,42 +217,6 @@ export const logout = async (_req, res, next) => {
 };
 
 // ======================= CURRENTLY PLAYING ===========
-export const syncCurrentlyPlaying = async (req, res, next) => {
-  try {
-    const { at } = req.cookies || {};
-    if (!at) return res.status(401).end();
-
-    const profile = await fetchMe(at);
-    const user = await User.findOne({ where: { spotifyId: profile.id } });
-    if (!user) return res.status(404).end();
-
-    // optional flag
-    if (user.shareCurrentlyPlaying === false) {
-      await user.update({ currentlyPlaying: null });
-      return res.json({ ok: true });
-    }
-
-    const data = await fetchCurrentlyPlaying(at);
-
-    const payload = data?.item
-      ? {
-          isPlaying: true,
-          updatedAt: new Date().toISOString(),
-          track: {
-            name: data.item.name,
-            artists: (data.item.artists || []).map((a) => a.name),
-            albumImage: data.item.album?.images?.[0]?.url ?? null,
-            uri: data.item.uri,
-          },
-        }
-      : { isPlaying: false, updatedAt: new Date().toISOString() };
-
-    await user.update({ currentlyPlaying: payload });
-    return res.json(payload);
-  } catch (e) {
-    return next(e);
-  }
-};
 
 // ======================= DEVICES =====================
 export const devices = async (req, res) => {
