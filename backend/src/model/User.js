@@ -1,7 +1,36 @@
 import { DataTypes, Model } from 'sequelize';
 import { sequelize } from './db.js';
 
-class User extends Model {}
+class User extends Model {
+  // Add a method to get safe user data for frontend
+  toJSON() {
+    const values = { ...this.get() };
+
+    // Convert snake_case to camelCase for frontend
+    return {
+      id: values.id,
+      spotifyId: values.spotifyId,
+      displayName: values.displayName,
+      display_name: values.displayName, // Keep both for compatibility
+      email: values.email,
+      avatarUrl: values.avatarUrl,
+      avatar_url: values.avatarUrl, // Keep both for compatibility
+      country: values.country,
+      product: values.product,
+      bio: values.bio,
+      isVisible: values.isVisible,
+      is_visible: values.isVisible, // Keep both for compatibility
+      topArtists: values.topArtists,
+      top_artists: values.topArtists, // Keep both for compatibility
+      topTracks: values.topTracks,
+      top_tracks: values.topTracks, // Keep both for compatibility
+      genres: values.genres,
+      createdAt: values.createdAt,
+      updatedAt: values.updatedAt,
+    };
+  }
+}
+
 User.init(
   {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
@@ -19,13 +48,12 @@ User.init(
     topArtists: { type: DataTypes.JSONB, field: 'top_artists' },
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
     genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
-    
-    },
-
+  },
   {
     sequelize,
     modelName: 'User',
     tableName: 'users',
   },
 );
+
 export default User;

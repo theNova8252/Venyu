@@ -18,7 +18,7 @@
             <div class="flex column items-center q-gutter-md">
               <div class="avatar-container">
                 <q-avatar size="160px" class="avatar-glow">
-                  <img :src="previewUrl || user?.avatar_url || defaultAvatar" alt="avatar" />
+                  <img :src="previewUrl || userAvatar || defaultAvatar" alt="avatar" />
                 </q-avatar>
                 <div v-if="previewUrl" class="avatar-badge">
                   <q-icon name="fiber_new" size="sm" />
@@ -298,18 +298,50 @@ const $q = useQuasar();
 const auth = useAuthStore();
 
 const user = computed(() => auth.user);
+const resolveAvatarUrl = (url) => {
+  if (!url) return null;
+
+  // If it's already a full URL, return as-is
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+
+  // Return relative path - Vite proxy will forward to backend
+  return url;
+};
+
+// Fix avatar display - prioritize uploaded avatar over Spotify
+const userAvatar = computed(() => {
+  const u = user.value;
+  if (!u) return defaultAvatar.value;
+  if (!u) return defaultAvatar.value;
+
+  // Priority: database avatar > Spotify images > default
+  if (u.avatarUrl) {
+    return resolveAvatarUrl(u.avatarUrl);
+  }
+  if (u.avatar_url) {
+    return resolveAvatarUrl(u.avatar_url);
+  }
+  if (u.images?.[0]?.url) {
+    return u.images[0].url;
+  }
+
+  return defaultAvatar.value;
+});
+
 const genres = computed(() => {
   const g = user.value?.genres;
   return Array.isArray(g) ? g : [];
 });
 
 const topArtists = computed(() => {
-  const artists = user.value?.top_artists;
+  const artists = user.value?.top_artists || user.value?.topArtists;
   return Array.isArray(artists) ? artists : [];
 });
 
 const topTracks = computed(() => {
-  const tracks = user.value?.top_tracks;
+  const tracks = user.value?.top_tracks || user.value?.topTracks;
   return Array.isArray(tracks) ? tracks : [];
 });
 
@@ -357,10 +389,23 @@ const getTrackArtists = (track) => {
   return 'Unbekannter Künstler';
 };
 
+
 onMounted(async () => {
-  if (!auth.ready) await auth.fetchMe();
+  // Wait for auth to be ready if not already
+  if (!auth.ready) {
+    await auth.fetchMe();
+  }
+
+  // If not authenticated, redirect to landing
+  if (!auth.isAuthenticated) {
+    router.push('/');
+    return;
+  }
+
+  // Load profile data
   await loadProfile();
 });
+
 
 const doLogout = async () => {
   try {
@@ -385,7 +430,6 @@ const doLogout = async () => {
     });
   }
 };
-
 async function loadProfile() {
   try {
     const res = await fetch('/api/user/me', { credentials: 'include' });
@@ -396,17 +440,15 @@ async function loadProfile() {
 
     const data = await res.json();
 
-    if (data.avatar_url) {
-      const timestamp = new Date().getTime();
-      data.avatar_url = data.avatar_url.includes('?')
-        ? `${data.avatar_url}&t=${timestamp}`
-        : `${data.avatar_url}?t=${timestamp}`;
-    }
+    console.log('👤 Profile data received:', data);
+    console.log('🖼️ Avatar URL (raw):', data.avatarUrl || data.avatar_url);
+    console.log('🖼️ Avatar URL (resolved):', resolveAvatarUrl(data.avatarUrl || data.avatar_url));
 
+    // Update auth store with fresh data
     auth.user = data;
 
     form.value.bio = data.bio || '';
-    form.value.is_visible = !!data.is_visible;
+    form.value.is_visible = data.is_visible !== undefined ? data.is_visible : data.isVisible !== false;
   } catch (error) {
     console.error('Load profile error:', error);
   }
@@ -479,34 +521,34 @@ async function uploadAvatar() {
     });
 
     if (!res.ok) {
+      const errorText = await res.text();
+      console.error('Upload failed:', errorText);
       throw new Error('Upload failed');
     }
 
     const data = await res.json();
+    console.log('✅ Upload response:', data);
 
-    if (data?.avatar_url) {
-      if (previewUrl.value) {
-        URL.revokeObjectURL(previewUrl.value);
-      }
-      previewUrl.value = '';
-      file.value = null;
-
-      const timestamp = new Date().getTime();
-      const avatarUrlWithCacheBuster = data.avatar_url.includes('?')
-        ? `${data.avatar_url}&t=${timestamp}`
-        : `${data.avatar_url}?t=${timestamp}`;
-
-      auth.user = { ...auth.user, avatar_url: avatarUrlWithCacheBuster };
-
-      await loadProfile();
-
-      $q.notify({
-        type: 'positive',
-        message: 'Profilbild erfolgreich hochgeladen',
-        icon: 'cloud_done',
-        position: 'top'
-      });
+    // Clear preview
+    if (previewUrl.value) {
+      URL.revokeObjectURL(previewUrl.value);
     }
+    previewUrl.value = '';
+    file.value = null;
+
+    // Force reload profile - IMPORTANT: Wait for both to complete
+    await Promise.all([
+      loadProfile(),
+      auth.fetchMe()
+    ]);
+    console.log('🔄 Refreshed user data:', auth.user);
+
+    $q.notify({
+      type: 'positive',
+      message: 'Profilbild erfolgreich hochgeladen',
+      icon: 'cloud_done',
+      position: 'top'
+    });
   } catch (error) {
     console.error('Upload error:', error);
     $q.notify({
@@ -564,7 +606,6 @@ const deleteAccount = async () => {
       timeout: 3000
     });
 
-    // Clear auth state and redirect
     auth.user = null;
     auth.ready = false;
 
@@ -586,7 +627,6 @@ const deleteAccount = async () => {
   }
 };
 </script>
-
 <style scoped>
 .profile-page {
   min-height: 100vh;
@@ -1137,7 +1177,13 @@ textarea:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(167, 139, 250, 0.5);
 }
-
+.avatar-glow img,
+.artist-avatar img,
+.track-avatar img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
 /* Print styles */
 @media print {
 

@@ -278,7 +278,11 @@ const testimonialsSection = ref(null)
 const ctaSection = ref(null)
 const featureCards = ref([])
 const visibleSections = ref(new Set())
-
+const loginWithSpotify = () => {
+  // Create state with returnTo path
+  const state = btoa(JSON.stringify({ returnTo: `${window.location.origin}/profile` }));
+  window.location.href = `/api/spotify/auth/login?state=${encodeURIComponent(state)}`;
+};
 const features = ref([
   {
     icon: 'headphones',

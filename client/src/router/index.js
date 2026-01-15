@@ -1,15 +1,15 @@
-import { createRouter, createWebHistory } from "vue-router";
-import HomeView from "@/views/HomeView.vue";
-import LoginView from "@/views/LoginView.vue";
-import CallbackView from "@/views/CallbackView.vue";
-import ProtectedView from "@/views/ProtectedView.vue";
-import LandingView from "../views/LandingView.vue";
-import OnboardingPage from "@/views/OnboardingPage.vue";
-import SwipeCard from "../views/SwipeCard.vue";
-import ProfileView from "@/views/ProfileView.vue";
-import AuthCallback from "@/views/AuthCallback.vue";
-import { useAuthStore } from "@/stores/auth.js";
-import ChatView from "@/views/ChatView.vue";
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '@/views/HomeView.vue';
+import LoginView from '@/views/LoginView.vue';
+import CallbackView from '@/views/CallbackView.vue';
+import ProtectedView from '@/views/ProtectedView.vue';
+import LandingView from '../views/LandingView.vue';
+import OnboardingPage from '@/views/OnboardingPage.vue';
+import SwipeCard from '../views/SwipeCard.vue';
+import ProfileView from '@/views/ProfileView.vue';
+import AuthCallback from '@/views/AuthCallback.vue';
+import { useAuthStore } from '@/stores/auth.js';
+import ChatView from '@/views/ChatView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,7 +17,7 @@ const router = createRouter({
     { path: '/', component: LandingView },
     { path: '/login', component: LoginView },
     { path: '/home', name: 'Home', component: HomeView },
-    { path: '/callback', component: CallbackView },
+    { path: '/callback', component: AuthCallback },
     {
       path: '/protected',
       component: ProtectedView,
@@ -51,34 +51,25 @@ const router = createRouter({
       path: '/events',
       component: () => import('../views/EventMap.vue'),
     },
+    {
+      path: '/auth/callback',
+      component: AuthCallback,
+    },
   ],
 });
 
-router.beforeEach(async (to) => {
+router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore();
+
   if (!auth.ready) {
     await auth.fetchMe();
   }
 
-  if (to.meta.requiresAuth && !auth.user) {
-    auth.setIntended(to.fullPath);
-    // Lieber auf '/login' oder Landing? Du hast beides.
-    return { path: "/login", query: { redirect: to.fullPath } };
-  }
-
-  return true;
-});
-
-router.beforeResolve((to) => {
-  const auth = useAuthStore();
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { path: "/login", query: { redirect: to.fullPath } };
+    next('/');
+  } else {
+    next();
   }
-});
-
-router.addRoute({
-  path: "/auth/callback",
-  component: AuthCallback,
 });
 
 export default router;

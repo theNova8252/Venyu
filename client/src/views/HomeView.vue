@@ -306,7 +306,7 @@
                 </div>
                 <h3>My Matches</h3>
               </div>
-            </div>
+            </div>^
 
             <div v-if="loadingMatches" class="q-gutter-sm">
               <q-skeleton v-for="i in 3" :key="i" height="64px" />
