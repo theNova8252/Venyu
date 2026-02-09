@@ -49,6 +49,7 @@ const router = createRouter({
     },
     {
       path: '/events',
+      name: 'EventMap',
       component: () => import('../views/EventMap.vue'),
     },
     {

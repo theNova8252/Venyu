@@ -121,7 +121,7 @@
 
             <q-separator class="q-my-md" />
 
-            <q-item clickable v-ripple class="nav-item">
+            <q-item clickable v-ripple :to="{ name: 'EventMap' }" class="nav-item">
               <q-item-section avatar>
                 <q-icon name="event" />
               </q-item-section>

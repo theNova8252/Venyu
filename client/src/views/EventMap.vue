@@ -34,21 +34,21 @@ function showNotification(message, type = 'interested') {
   }, 2500);
 }
 
-function buildCarouselPopup(group) {
+function buildCarouselPopup(cluster) {
   let currentIndex = 0;
 
   const container = document.createElement("div");
   container.className = "popup-carousel";
 
   const render = () => {
-    const event = group[currentIndex];
+    const event = cluster.events[currentIndex];
     const { interested, going } = events.getRsvp(event.id);
 
     container.innerHTML = `
   <div class="popup-content">
     <div class="popup-title">${event.title}</div>
-    <div class="popup-venue">${event.venue || "Venue"}</div>
-    <div class="popup-location">${event.city}</div>
+    <div class="popup-venue">${cluster.venue}</div>
+    <div class="popup-location">${cluster.city}</div>
     <div class="popup-date">${new Date(event.date).toLocaleDateString('en-US', {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
     })}</div>
@@ -68,10 +68,10 @@ function buildCarouselPopup(group) {
     ${event.url ? `<a class="popup-link" href="${event.url}" target="_blank" rel="noopener">Get Tickets</a>` : ''}
   </div>
 
-  ${group.length > 1 ? `
+  ${cluster.events.length > 1 ? `
     <div class="popup-nav">
       <button class="nav-btn" data-action="prev">‹</button>
-      <div class="nav-counter">${currentIndex + 1} / ${group.length}</div>
+      <div class="nav-counter">${currentIndex + 1} / ${cluster.events.length}</div>
       <button class="nav-btn" data-action="next">›</button>
     </div>
   ` : ''}
@@ -88,10 +88,18 @@ function buildCarouselPopup(group) {
 
     const action = button.dataset.action;
 
-    if (action === "next") { currentIndex = (currentIndex + 1) % group.length; render(); return; }
-    if (action === "prev") { currentIndex = (currentIndex - 1 + group.length) % group.length; render(); return; }
+    if (action === "next") {
+      currentIndex = (currentIndex + 1) % cluster.events.length;
+      render();
+      return;
+    }
+    if (action === "prev") {
+      currentIndex = (currentIndex - 1 + cluster.events.length) % cluster.events.length;
+      render();
+      return;
+    }
 
-    if (saving) return;           // 🔒 spam-schutz
+    if (saving) return;
     saving = true;
 
     const id = button.dataset.id;
@@ -101,15 +109,17 @@ function buildCarouselPopup(group) {
       if (action === "toggleGoing") await events.toggleGoing(id);
     } finally {
       saving = false;
-      render();                   // ✅ render AFTER async finished
+      render();
     }
   });
+
   return container;
 }
 
 onMounted(async () => {
   await events.fetchNearby();
   console.log("EVENTS FROM STORE:", events.list);
+  console.log("CLUSTERED:", events.clusteredEvents);
 
   const map = new mapboxgl.Map({
     container: "map",
@@ -124,22 +134,8 @@ onMounted(async () => {
   map.on("load", () => {
     map.resize();
 
-    const groups = {};
-    events.list.forEach((e) => {
-      const lat = Number(e.lat);
-      const lng = Number(e.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-      const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(e);
-    });
-
-    Object.entries(groups).forEach(([key, group]) => {
-      const [latStr, lngStr] = key.split(",");
-      const lat = Number(latStr);
-      const lng = Number(lngStr);
-
+    // ✅ USE CLUSTERED EVENTS INSTEAD OF MANUAL GROUPING
+    events.clusteredEvents.forEach((cluster) => {
       const markerEl = document.createElement("div");
       markerEl.className = "venue-marker";
       markerEl.innerHTML = `
@@ -147,11 +143,11 @@ onMounted(async () => {
           <div class="marker-dot">
             <div class="marker-center"></div>
           </div>
-          ${group.length > 1 ? `<div class="marker-badge">${group.length}</div>` : ''}
+          ${cluster.count > 1 ? `<div class="marker-badge">${cluster.count}</div>` : ''}
         </div>
       `;
 
-      const popupEl = buildCarouselPopup(group);
+      const popupEl = buildCarouselPopup(cluster);
       const popup = new mapboxgl.Popup({
         offset: 25,
         maxWidth: '320px',
@@ -161,7 +157,7 @@ onMounted(async () => {
       }).setDOMContent(popupEl);
 
       new mapboxgl.Marker(markerEl)
-        .setLngLat([lng, lat])
+        .setLngLat([cluster.lng, cluster.lat])
         .setPopup(popup)
         .addTo(map);
     });
