@@ -198,7 +198,7 @@ const toggleLeftDrawer = () => {
 
 const handleLogout = () => {
   auth.logout();
-  router.push({ name: 'Landing' });
+  router.push('/');
 };
 </script>
 
