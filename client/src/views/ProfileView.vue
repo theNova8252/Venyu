@@ -122,10 +122,16 @@
                 <q-icon name="music_note" class="q-mr-sm" />
                 Dein Musikprofil
               </div>
-              <q-badge color="green-6" text-color="white" class="spotify-connected-badge">
-                <q-icon name="check_circle" size="xs" class="q-mr-xs" />
-                Spotify verbunden
-              </q-badge>
+              <div class="flex q-gutter-sm items-center">
+                <q-badge color="green-6" text-color="white" class="spotify-connected-badge">
+                  <q-icon name="check_circle" size="xs" class="q-mr-xs" />
+                  Spotify verbunden
+                </q-badge>
+                <q-btn unelevated dense icon="sync" label="Sync" color="purple-5" size="sm" no-caps
+                  @click="syncSpotifyData" :loading="syncing">
+                  <q-tooltip>Spotify-Daten neu laden</q-tooltip>
+                </q-btn>
+              </div>
             </div>
 
             <div v-if="genres.length" class="q-mb-lg">
@@ -169,7 +175,7 @@
                         <div class="column items-end q-gutter-xs">
                           <q-badge v-if="artist.popularity != null" color="deep-purple-4" text-color="white"
                             class="popularity-badge">
-                             {{ artist.popularity }}
+                            {{ artist.popularity }}
                             <q-icon name="trending_up" size="xs" class="q-ml-xs" />
                           </q-badge>
                           <div class="rank-badge">
@@ -229,9 +235,11 @@
               <div class="text-h6 text-grey-4 q-mb-sm">
                 Keine Spotify-Daten verfügbar
               </div>
-              <div class="text-caption text-grey-6">
-                Verbinde dein Spotify-Konto, um dein Musikprofil anzuzeigen
+              <div class="text-caption text-grey-6 q-mb-md">
+                Lade deine Spotify-Daten, um dein Musikprofil anzuzeigen
               </div>
+              <q-btn unelevated icon="sync" label="Spotify-Daten laden" color="purple-5" size="md" no-caps
+                @click="syncSpotifyData" :loading="syncing" />
             </div>
           </q-card>
         </div>
@@ -292,6 +300,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useQuasar } from 'quasar';
+import { api } from '@/api';
 
 const router = useRouter();
 const $q = useQuasar();
@@ -355,6 +364,7 @@ const hasSpotifyData = computed(
 const form = ref({ bio: '', is_visible: true });
 const saving = ref(false);
 const uploading = ref(false);
+const syncing = ref(false);
 const file = ref(null);
 const previewUrl = ref('');
 const defaultAvatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=default';
@@ -488,6 +498,35 @@ async function save() {
     });
   } finally {
     saving.value = false;
+  }
+}
+
+async function syncSpotifyData() {
+  syncing.value = true;
+
+  try {
+    const result = await api.syncSpotifyData();
+
+    $q.notify({
+      type: 'positive',
+      message: `✅ ${result.topArtists} Artists, ${result.topTracks} Songs, ${result.genres} Genres geladen`,
+      icon: 'check_circle',
+      position: 'top',
+      timeout: 3000
+    });
+
+    // Reload profile to show new data
+    await loadProfile();
+  } catch (error) {
+    console.error('Sync error:', error);
+    $q.notify({
+      type: 'negative',
+      message: 'Fehler beim Laden der Spotify-Daten',
+      icon: 'error',
+      position: 'top'
+    });
+  } finally {
+    syncing.value = false;
   }
 }
 
@@ -1177,6 +1216,7 @@ textarea:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(167, 139, 250, 0.5);
 }
+
 .avatar-glow img,
 .artist-avatar img,
 .track-avatar img {
@@ -1184,6 +1224,7 @@ textarea:focus-visible {
   width: 100%;
   height: 100%;
 }
+
 /* Print styles */
 @media print {
 

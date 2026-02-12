@@ -17,7 +17,7 @@
           </div>
         </div>
       </div>
-    </div>
+
       <!-- No More Cards Message -->
       <transition name="fade">
         <div v-if="currentCardIndex >= cards.length" class="no-cards-container">
@@ -25,14 +25,8 @@
             <q-icon name="check_circle" size="80px" color="green-5" />
             <h2 class="no-cards-title">You're all caught up!</h2>
             <p class="no-cards-subtitle">Check back later for more matches</p>
-            <q-btn
-              unelevated
-              color="purple-5"
-              label="Back to Home"
-              @click="$router.push({ name: 'Home' })"
-              no-caps
-              class="home-btn"
-            />
+            <q-btn unelevated color="purple-5" label="Back to Home" @click="$router.push({ name: 'Home' })" no-caps
+              class="home-btn" />
           </div>
         </div>
       </transition>
@@ -40,17 +34,11 @@
       <!-- Cards Stack -->
       <div v-if="currentCardIndex < cards.length" class="cards-stack">
         <!-- Background cards for depth -->
-        <div
-          v-for="(card, index) in visibleCards"
-          :key="card.id"
-          class="profile-card"
-          :class="{
-            'card-active': index === 0,
-            'card-next': index === 1,
-            'card-behind': index === 2,
-          }"
-          :style="getCardStyle(index)"
-        >
+        <div v-for="(card, index) in visibleCards" :key="card.id" class="profile-card" :class="{
+          'card-active': index === 0,
+          'card-next': index === 1,
+          'card-behind': index === 2,
+        }" :style="getCardStyle(index)">
           <!-- Card Content -->
           <div class="card-image-container">
             <img :src="card.avatar" :alt="card.name" class="card-image" />
@@ -68,7 +56,7 @@
             <div class="card-header">
               <div class="name-age">
                 <h2 class="card-name">{{ card.name }}</h2>
-                <span class="card-age">{{ card.age }}</span>
+                <span v-if="card.age != null" class="card-age">{{ card.age }}</span>
               </div>
               <div class="location">
                 <q-icon name="place" size="18px" />
@@ -81,66 +69,59 @@
             </div>
 
             <!-- Music Info -->
-            <div class="music-section">
+            <div class="music-section" v-if="card.topArtists && card.topArtists.length > 0">
               <div class="music-header">
                 <q-icon name="music_note" size="20px" color="purple-5" />
                 <span class="music-title">Top Artists</span>
               </div>
               <div class="artists-chips">
-                <div
-                  v-for="artist in card.topArtists.slice(0, 3)"
-                  :key="artist"
-                  class="artist-chip-small"
-                >
+                <div v-for="(artist, idx) in card.topArtists.slice(0, 5)" :key="idx" class="artist-chip-small">
                   {{ artist }}
                 </div>
               </div>
             </div>
 
-            <div class="music-section">
+            <div class="music-section" v-else>
+              <div class="text-center text-grey-6 text-caption">
+                <q-icon name="music_off" size="sm" />
+                No artists data
+              </div>
+            </div>
+
+            <div class="music-section" v-if="card.genres && card.genres.length > 0">
               <div class="music-header">
                 <q-icon name="category" size="20px" color="pink-5" />
                 <span class="music-title">Genres</span>
               </div>
               <div class="genres-chips">
-                <div
-                  v-for="genre in card.genres.slice(0, 4)"
-                  :key="genre"
-                  class="genre-chip-small"
-                >
+                <div v-for="(genre, idx) in card.genres.slice(0, 6)" :key="idx" class="genre-chip-small">
                   {{ genre }}
                 </div>
               </div>
+            </div>
+
+            <div class="music-section" v-else>
+              <div class="text-center text-grey-6 text-caption">
+                <q-icon name="category_off" size="sm" />
+                No genres data
               </div>
             </div>
-      </div>
-      
+          </div>
+        </div>
 
-      <!-- Action Buttons -->
-      <div v-if="currentCardIndex < cards.length" class="action-buttons">
-        <q-btn
-          round
-          size="xl"
-          icon="close"
-          color="red-5"
-          class="action-btn dislike-btn"
-          @click="swipeLeft"
-          :disable="isAnimating"
-        >
-          <q-tooltip>Dislike</q-tooltip>
-        </q-btn>
 
-        <q-btn
-          round
-          size="xl"
-          icon="favorite"
-          color="green-5"
-          class="action-btn like-btn"
-          @click="swipeRight"
-          :disable="isAnimating"
-        >
-          <q-tooltip>Like</q-tooltip>
-        </q-btn>
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <q-btn round size="xl" icon="close" color="red-5" class="action-btn dislike-btn" @click="swipeLeft"
+            :disable="isAnimating">
+            <q-tooltip>Dislike</q-tooltip>
+          </q-btn>
+
+          <q-btn round size="xl" icon="favorite" color="green-5" class="action-btn like-btn" @click="swipeRight"
+            :disable="isAnimating">
+            <q-tooltip>Like</q-tooltip>
+          </q-btn>
+        </div>
       </div>
     </div>
 
@@ -159,12 +140,8 @@
           </p>
 
           <div class="match-avatars">
-            <img
-              :src="
-                userStore.me?.avatarUrl || 'https://i.pravatar.cc/150?img=1'
-              "
-              class="match-avatar"
-            />
+            <img :src="userStore.me?.avatarUrl || 'https://i.pravatar.cc/150?img=1'
+              " class="match-avatar" />
 
             <div class="heart-connector">
               <q-icon name="favorite" size="40px" color="pink-5" />
@@ -173,22 +150,8 @@
           </div>
 
           <div class="match-actions">
-            <q-btn
-              outline
-              color="grey-7"
-              label="Keep Swiping"
-              @click="closeMatchModal"
-              no-caps
-              class="match-btn"
-            />
-            <q-btn
-              unelevated
-              color="purple-5"
-              label="Send Message"
-              @click="sendMessage"
-              no-caps
-              class="match-btn"
-            />
+            <q-btn outline color="grey-7" label="Keep Swiping" @click="closeMatchModal" no-caps class="match-btn" />
+            <q-btn unelevated color="purple-5" label="Send Message" @click="sendMessage" no-caps class="match-btn" />
           </div>
         </div>
       </q-card>
@@ -218,13 +181,43 @@ const currentRoomId = ref(null); // Chat-Room für das Match
 
 const chatsStore = useChatsStore();
 
+const toArray = (value) => {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+
+  return [];
+};
+
+const toArtistNames = (value) =>
+  toArray(value)
+    .map((artist) => (typeof artist === "string" ? artist : artist?.name))
+    .filter(Boolean);
+
+const toGenres = (value) =>
+  toArray(value)
+    .map((genre) => String(genre).trim())
+    .filter(Boolean);
+
 // Karten direkt aus den Matches
 const cards = computed(() =>
   matchesStore.list.map((m, index) => ({
     id: m.id ?? m.userId ?? `match-${index}`,
-    userId: m.id ?? m.userId, // wichtig für Like-Endpoint
+    userId: m.userId ?? m.id ?? m.user?.id, // wichtig für Like-Endpoint
     name: m.displayName ?? m.name ?? "Unknown",
-    age: m.age ?? m.user?.age ?? 0,
+    age: Number.isFinite(Number(m.age ?? m.user?.age))
+      ? Number(m.age ?? m.user?.age)
+      : null,
     avatar:
       m.avatar ??
       m.avatar_url ??
@@ -234,9 +227,14 @@ const cards = computed(() =>
     distance:
       m.distance ??
       (m.distanceKm != null ? `${m.distanceKm} km away` : "Nearby"),
-    topArtists: m.topArtists ?? m.spotifyTopArtists ?? [],
-    genres: m.genres ?? m.spotifyGenres ?? [],
-    matchScore: m.score ?? m.machScore ?? m.compatibility ?? 0,
+    topArtists: toArtistNames(
+      m.topArtists ?? m.top_artists ?? m.spotifyTopArtists ?? m.spotify_top_artists
+    ),
+    genres: toGenres(m.genres ?? m.spotifyGenres ?? m.spotify_genres),
+    matchScore:
+      Number(m.matchScore ?? m.score ?? m.compatibility) > 0
+        ? Number(m.matchScore ?? m.score ?? m.compatibility)
+        : 80,
   }))
 );
 
@@ -335,7 +333,8 @@ onMounted(async () => {
   if (!userStore.me) {
     await userStore.fetchMe();
   }
-  await matchesStore.fetchMatches();
+  // Force refresh to avoid cached data
+  await matchesStore.fetchMatches(true);
   matchesStore.connectNowPlayingWS();
 });
 </script>
@@ -391,6 +390,7 @@ onMounted(async () => {
 }
 
 @keyframes floatOrb {
+
   0%,
   100% {
     transform: translate(0, 0) scale(1);
@@ -414,7 +414,7 @@ onMounted(async () => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .swipe-header {
@@ -442,16 +442,20 @@ onMounted(async () => {
 }
 
 .cards-stack {
-  flex: 0 0 auto;
+  flex: 1;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 560px;
+  min-height: 700px;
+  margin: 0 auto;
+  width: 100%;
+  padding-bottom: 5.5rem;
 }
 
 .profile-card {
   position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   width: 100%;
   max-width: 380px;
   background: rgba(20, 20, 30, 0.98);
@@ -501,12 +505,10 @@ onMounted(async () => {
   left: 0;
   right: 0;
   height: 40%;
-  background: linear-gradient(
-    to top,
-    rgba(20, 20, 30, 1) 0%,
-    rgba(20, 20, 30, 0.6) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(to top,
+      rgba(20, 20, 30, 1) 0%,
+      rgba(20, 20, 30, 0.6) 50%,
+      transparent 100%);
 }
 
 .match-badge {
@@ -649,8 +651,32 @@ onMounted(async () => {
   gap: 3rem;
   padding: 0;
   flex-shrink: 0;
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
   z-index: 10;
+  width: 100%;
+}
+
+.no-cards-container {
+  flex: 1;
+  display: grid;
+  place-items: center;
+}
+
+.no-cards-content {
+  text-align: center;
+  color: white;
+}
+
+.no-cards-title {
+  margin: 1rem 0 0.4rem;
+}
+
+.no-cards-subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 1rem;
 }
 
 .action-btn {
@@ -699,7 +725,8 @@ onMounted(async () => {
   }
 
   .cards-stack {
-    height: 520px;
+    min-height: 620px;
+    padding-bottom: 5rem;
   }
 
   .profile-card {

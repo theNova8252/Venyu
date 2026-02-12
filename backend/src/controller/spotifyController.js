@@ -293,3 +293,76 @@ export const play = async (req, res) => {
     });
   }
 };
+
+// ======================= SYNC MUSIC DATA =====================
+export const syncMusicData = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
+
+    const profile = await fetchMe(at);
+    const user = await User.findOne({ where: { spotifyId: profile.id } });
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+
+    console.log('🔄 Syncing music data for user:', user.displayName);
+
+    // Fetch fresh data from Spotify
+    const [topArtistsRes, topTracksRes, meProfile] = await Promise.all([
+      fetchTopArtists(at, { timeRange: 'medium_term', limit: 20 }),
+      fetchTopTracks(at, { timeRange: 'medium_term', limit: 20 }),
+      fetchMe(at),
+    ]);
+
+    const topArtists = (topArtistsRes?.items || []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      genres: a.genres,
+      popularity: a.popularity,
+      image: a.images?.[0]?.url ?? null,
+      uri: a.uri,
+      followers: a.followers,
+    }));
+
+    const topTracks = (topTracksRes?.items || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      uri: t.uri,
+      previewUrl: t.preview_url,
+      durationMs: t.duration_ms,
+      popularity: t.popularity,
+      album: {
+        id: t.album?.id,
+        name: t.album?.name,
+        image: t.album?.images?.[0]?.url ?? null,
+      },
+      artists: (t.artists || []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        uri: a.uri,
+      })),
+    }));
+
+    const genresSet = new Set();
+    topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
+    const genres = Array.from(genresSet);
+
+    console.log(`  ✅ Found ${topArtists.length} artists, ${genres.length} genres`);
+
+    await user.update({
+      topArtists,
+      topTracks,
+      genres,
+      avatarUrl: meProfile.images?.[0]?.url ?? user.avatarUrl, // Update avatar too
+    });
+
+    return res.json({
+      success: true,
+      topArtists: topArtists.length,
+      topTracks: topTracks.length,
+      genres: genres.length,
+    });
+  } catch (e) {
+    console.error('syncMusicData error:', e);
+    return next(e);
+  }
+};

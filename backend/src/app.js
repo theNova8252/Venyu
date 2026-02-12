@@ -70,6 +70,35 @@ function makeRoomId(a, b) {
   return [a, b].sort().join('__');
 }
 
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+
+  return [];
+}
+
+function getArtistName(artist) {
+  if (typeof artist === 'string') return artist;
+  if (artist && typeof artist.name === 'string') return artist.name;
+  return null;
+}
+
+function getArtistId(artist) {
+  if (artist && typeof artist === 'object' && typeof artist.id === 'string') return artist.id;
+  return null;
+}
+
 // ---------- API-Routen ----------
 app.use('/api/spotify', spotifyRoutes);
 app.use('/api/user', userRoutes);
@@ -81,6 +110,9 @@ app.use('/api/events', eventRsvpRoutes);
 app.get('/api/matches/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
+    const myTopArtists = toArray(me.topArtists);
+    const myArtistIds = new Set(myTopArtists.map(getArtistId).filter(Boolean));
+    const myGenres = new Set(toArray(me.genres).map((genre) => String(genre).toLowerCase()));
 
     const others = await User.findAll({
       where: {
@@ -89,17 +121,28 @@ app.get('/api/matches/candidates', async (req, res, next) => {
       },
     });
 
-    const result = others.map((u, index) => ({
-      id: u.id,
-      userId: u.id,
-      name: u.displayName || 'Unknown',
-      avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
-      bio: u.bio || 'Music lover 🎵',
-      distance: 'Nearby',
-      topArtists: [],
-      genres: [],
-      matchScore: 80,
-    }));
+    const result = others.map((u, index) => {
+      const candidateTopArtists = toArray(u.topArtists);
+      const candidateGenres = toArray(u.genres).map((genre) => String(genre));
+      const topArtists = candidateTopArtists.map(getArtistName).filter(Boolean);
+
+      const sharedArtists = candidateTopArtists.filter((artist) => myArtistIds.has(getArtistId(artist))).length;
+      const sharedGenres = candidateGenres.filter((genre) => myGenres.has(genre.toLowerCase())).length;
+      const matchScore = Math.min(99, 55 + sharedArtists * 10 + sharedGenres * 4);
+
+      return {
+        id: u.id,
+        userId: u.id,
+        name: u.displayName || 'Unknown',
+        age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
+        avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
+        bio: u.bio || 'Music lover 🎵',
+        distance: 'Nearby',
+        topArtists,
+        genres: candidateGenres,
+        matchScore,
+      };
+    });
 
     return res.json(result);
   } catch (e) {

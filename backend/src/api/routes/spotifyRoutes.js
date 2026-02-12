@@ -8,6 +8,7 @@ import {
   logout,
   devices,
   play,
+  syncMusicData,
 } from '../../controller/spotifyController.js';
 
 // // currently Playing
@@ -29,6 +30,7 @@ router.get('/auth/callback', callback);
 router.post('/auth/refresh', refresh);
 router.get('/me', me);
 router.post('/auth/logout', logout);
+router.post('/sync', syncMusicData);
 
 router.get('/player/devices', devices);
 router.post('/player/play', play);

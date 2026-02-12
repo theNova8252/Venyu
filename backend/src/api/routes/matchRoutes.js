@@ -70,18 +70,39 @@ router.get('/candidates', async (req, res, next) => {
       },
     });
 
-    const result = others.map((u, index) => ({
-      id: u.id,
-      userId: u.id,
-      name: u.displayName || 'Unknown',
-      avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
-      bio: u.bio || 'Music lover',
-      distance: 'Nearby',
-      topArtists: u.topArtists || [],
-      genres: u.genres || [],
-      matchScore: 80,
-    }));
+    console.log('✅ Candidates found:', others.length);
+    console.log('🔍 DEBUG: About to process candidates...');
 
+    const result = others.map((u, index) => {
+      // Debug: Log raw database data
+      console.log(`\n🔍 Raw DB data for ${u.displayName}:`);
+      console.log(`  topArtists: ${typeof u.topArtists} = ${u.topArtists ? JSON.stringify(u.topArtists).substring(0, 100) : 'NULL'}`);
+      console.log(`  genres: ${typeof u.genres} = ${JSON.stringify(u.genres)}`);
+      
+      // Extract artist names from objects
+      const artistNames = Array.isArray(u.topArtists)
+        ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
+        : [];
+
+      const candidate = {
+        id: u.id,
+        userId: u.id,
+        name: u.displayName || 'Unknown',
+        age: u.age || 25,
+        avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
+        bio: u.bio || 'Music lover',
+        distance: 'Nearby',
+        topArtists: artistNames,
+        genres: Array.isArray(u.genres) ? u.genres : [],
+        matchScore: 80,
+      };
+      console.log(
+        `  ✅ Output: topArtists=${candidate.topArtists.length}, genres=${candidate.genres.length}`,
+      );
+      return candidate;
+    });
+
+    console.log('📤 Sending candidates:', result.length);
     return res.json(result);
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });

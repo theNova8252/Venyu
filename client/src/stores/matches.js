@@ -1,7 +1,7 @@
-import { defineStore } from "pinia";
-import { api } from "@/api";
+import { defineStore } from 'pinia';
+import { api } from '@/api';
 
-export const useMatchesStore = defineStore("matches", {
+export const useMatchesStore = defineStore('matches', {
   state: () => ({
     list: [],
     loading: false,
@@ -10,19 +10,47 @@ export const useMatchesStore = defineStore("matches", {
   }),
 
   actions: {
-    async fetchMatches() {
+    async fetchMatches(forceRefresh = false) {
       this.loading = true;
       this.error = null;
       try {
-        // ✅ Backend liefert Candidates
-        const data = await api.getMatches();
-        this.list = (Array.isArray(data) ? data : []).sort(
-  (a, b) =>
-    (b.score ?? b.matchScore ?? b.compatibility ?? 0) -
-    (a.score ?? a.matchScore ?? a.compatibility ?? 0)
-);
+        // Add cache buster to force fresh data
+        const url = forceRefresh
+          ? `/api/matches/candidates?t=${Date.now()}`
+          : '/api/matches/candidates';
 
+        const res = await fetch(url, {
+          credentials: 'include',
+          cache: 'no-store', // Prevent caching
+        });
+
+        if (!res.ok) throw new Error('Failed to fetch matches');
+        const data = await res.json();
+
+        console.log('📥 Raw data from API:', data);
+
+        const candidates = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.candidates)
+            ? data.candidates
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+
+        console.log('👥 Candidates parsed:', candidates);
+        candidates.forEach((c) => {
+          console.log(
+            `  - ${c.name}: age=${c.age}, matchScore=${c.matchScore}, topArtists=${c.topArtists?.length}, genres=${c.genres?.length}`,
+          );
+        });
+
+        this.list = candidates.sort(
+          (a, b) =>
+            (b.score ?? b.matchScore ?? b.compatibility ?? 0) -
+            (a.score ?? a.matchScore ?? a.compatibility ?? 0),
+        );
       } catch (e) {
+        console.error('fetchMatches error:', e); // ✅ Add logging
         this.error = e?.message || String(e);
         this.list = [];
       } finally {
@@ -52,12 +80,12 @@ export const useMatchesStore = defineStore("matches", {
     connectNowPlayingWS() {
       if (this.ws) return;
 
-      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       this.ws = new WebSocket(`${proto}://${location.host}/ws/now-playing`);
 
       this.ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
-        if (msg.type !== "now_playing") return;
+        if (msg.type !== 'now_playing') return;
 
         const idx = this.list.findIndex((u) => u.id === msg.userId || u.userId === msg.userId);
         if (idx !== -1) {

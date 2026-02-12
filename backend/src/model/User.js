@@ -18,6 +18,7 @@ class User extends Model {
       country: values.country,
       product: values.product,
       bio: values.bio,
+      age: values.age,
       isVisible: values.isVisible,
       is_visible: values.isVisible, // Keep both for compatibility
       topArtists: values.topArtists,
@@ -44,6 +45,7 @@ User.init(
     refreshToken: { type: DataTypes.TEXT, field: 'refresh_token' },
     tokenExpiresAt: { type: DataTypes.DATE, field: 'token_expires_at' },
     bio: { type: DataTypes.TEXT },
+    age: { type: DataTypes.INTEGER },
     isVisible: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_visible' },
     topArtists: { type: DataTypes.JSONB, field: 'top_artists' },
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },

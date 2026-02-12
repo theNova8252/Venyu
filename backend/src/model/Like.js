@@ -21,7 +21,7 @@ Like.init(
       field: 'to_user_id',
     },
   },
-    {
+  {
     sequelize,
     modelName: 'Like',
     tableName: 'likes',
