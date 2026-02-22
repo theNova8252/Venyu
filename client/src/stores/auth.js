@@ -35,7 +35,7 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async login(returnTo = '/profile') {
+    async login(returnTo = '/swipe') {
       // Build state parameter with return URL
       const state = btoa(
         JSON.stringify({
@@ -45,6 +45,33 @@ export const useAuthStore = defineStore('auth', {
 
       // Redirect to Spotify auth with state
       window.location.href = `/api/spotify/auth/login?state=${encodeURIComponent(state)}`;
+    },
+
+    async handleAuthCallback() {
+      // Fetch user data after OAuth callback
+      await this.fetchMe();
+
+      // Parse state parameter to get return URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const state = urlParams.get('state');
+
+      if (state) {
+        try {
+          const decoded = JSON.parse(atob(state));
+          const returnTo = decoded.returnTo;
+
+          if (returnTo) {
+            // Extract path from full URL
+            const url = new URL(returnTo);
+            return url.pathname;
+          }
+        } catch (error) {
+          console.error('Error parsing state:', error);
+        }
+      }
+
+      // Default redirect to matching page
+      return '/swipe';
     },
 
     async logout() {

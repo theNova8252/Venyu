@@ -164,13 +164,20 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+
+// Initialize auth on app mount
+onMounted(async () => {
+  if (!auth.ready) {
+    await auth.fetchMe();
+  }
+});
 
 const leftDrawerOpen = ref(true);
 const searchQuery = ref("");
@@ -304,6 +311,7 @@ const handleLogout = () => {
     font-size: 1.1rem;
   }
 }
+
 .user-profile-section .q-avatar img,
 .menu-btn .q-avatar img {
   object-fit: cover;

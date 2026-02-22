@@ -1,296 +1,232 @@
 <template>
   <q-page class="profile-page">
-    <div class="animated-bg">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-      <div class="gradient-orb orb-3"></div>
-    </div>
+    <!-- Subtle mesh gradient background -->
+    <div class="bg-mesh"></div>
+    <div class="bg-noise"></div>
 
-    <div class="profile-container">
-      <div class="row q-col-gutter-xl items-start">
-        <div class="col-12 col-md-4">
-          <q-card class="glass-card q-pa-lg">
-            <div class="text-h5 text-weight-bold gradient-text q-mb-md">
-              <q-icon name="photo_camera" class="q-mr-sm" />
-              Profilbild
-            </div>
-
-            <div class="flex column items-center q-gutter-md">
-              <div class="avatar-container">
-                <q-avatar size="160px" class="avatar-glow">
-                  <img :src="previewUrl || userAvatar || defaultAvatar" alt="avatar" />
-                </q-avatar>
-                <div v-if="previewUrl" class="avatar-badge">
-                  <q-icon name="fiber_new" size="sm" />
-                </div>
-              </div>
-
-              <div class="full-width q-gutter-sm">
-                <q-btn flat unelevated icon="upload" label="Bild wählen" class="full-width modern-btn-outline" no-caps
-                  @click="$refs.fileInput.click()" />
-                <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFile" />
-
-                <q-btn unelevated icon="cloud_upload" label="Hochladen" class="full-width gradient-btn" no-caps
-                  :disable="!file" :loading="uploading" @click="uploadAvatar">
-                  <template v-slot:loading>
-                    <q-spinner-dots color="white" />
-                  </template>
-                </q-btn>
-              </div>
-            </div>
-          </q-card>
+    <!-- Top navigation bar -->
+    <header class="profile-topbar">
+      <div class="topbar-inner">
+        <div class="topbar-title">Profile</div>
+        <div class="topbar-actions">
+          <button class="topbar-btn topbar-btn--ghost" @click="doLogout">
+            <q-icon name="logout" size="18px" />
+            <span>Logout</span>
+          </button>
         </div>
+      </div>
+    </header>
 
-        <div class="col-12 col-md-8">
-          <q-card class="glass-card q-pa-lg">
-            <div class="row items-center justify-between q-mb-lg">
-              <div class="text-h5 text-weight-bold gradient-text">
-                <q-icon name="person" class="q-mr-sm" />
-                Mein Profil
-              </div>
-              <div class="flex q-gutter-sm">
-                <q-btn unelevated icon="logout" label="Logout" class="logout-btn" no-caps @click="doLogout" />
-                <q-btn unelevated icon="delete_forever" label="Account löschen" class="delete-btn" no-caps
-                  @click="showDeleteDialog" />
+    <div class="profile-layout">
+      <!-- Hero / Identity card -->
+      <section class="hero-card">
+        <div class="hero-card__bg"></div>
+        <div class="hero-card__content">
+          <!-- Avatar -->
+          <div class="hero-avatar-wrap">
+            <div class="hero-avatar" @click="$refs.fileInput.click()">
+              <img :src="previewUrl || userAvatar || defaultAvatar" alt="avatar" />
+              <div class="hero-avatar__overlay">
+                <q-icon name="photo_camera" size="24px" />
               </div>
             </div>
+            <input ref="fileInput" type="file" accept="image/*" class="sr-only" @change="onFile" />
+            <transition name="fade">
+              <button v-if="file" class="upload-pill" :disabled="uploading" @click="uploadAvatar">
+                <q-spinner-dots v-if="uploading" color="white" size="16px" />
+                <template v-else>
+                  <q-icon name="cloud_upload" size="16px" />
+                  <span>Upload</span>
+                </template>
+              </button>
+            </transition>
+          </div>
 
-            <div class="q-mb-lg badges-container">
-              <q-badge class="info-badge spotify-badge" v-if="user?.display_name">
-                <q-icon
-                  name="img:https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/168px-Spotify_logo_without_text.svg.png"
-                  size="16px" class="q-mr-xs" />
-                {{ user.display_name }}
-              </q-badge>
-
-              <q-badge class="info-badge premium-badge" v-if="user?.product">
-                <q-icon name="star" size="16px" class="q-mr-xs" />
-                {{ user.product }}
-              </q-badge>
-
-              <q-badge class="info-badge email-badge" v-if="user?.email">
-                <q-icon name="email" size="16px" class="q-mr-xs" />
+          <!-- Identity -->
+          <div class="hero-identity">
+            <h1 class="hero-name">{{ user?.display_name || 'Your Profile' }}</h1>
+            <div class="hero-meta">
+              <span v-if="user?.email" class="meta-chip">
+                <q-icon name="mail" size="14px" />
                 {{ user.email }}
-              </q-badge>
+              </span>
+              <span v-if="user?.product" class="meta-chip meta-chip--accent">
+                <q-icon name="star" size="14px" />
+                {{ user.product }}
+              </span>
             </div>
-
-            <q-form @submit.prevent="save">
-              <div class="q-gutter-md">
-                <div>
-                  <label class="input-label">
-                    <q-icon name="edit_note" class="q-mr-xs" />
-                    Bio
-                  </label>
-                  <q-input v-model="form.bio" type="textarea" outlined placeholder="Erzähl etwas über dich..." autogrow
-                    maxlength="500" counter class="modern-input" :input-style="{ minHeight: '100px' }" />
-                </div>
-
-                <div class="visibility-toggle">
-                  <q-toggle v-model="form.is_visible" color="purple-5" size="lg">
-                    <template v-slot:default>
-                      <div class="toggle-label">
-                        <q-icon :name="form.is_visible ? 'visibility' : 'visibility_off'" size="sm" class="q-mr-sm" />
-                        <span class="text-weight-medium">
-                          Profil ist {{ form.is_visible ? 'öffentlich' : 'privat' }}
-                        </span>
-                      </div>
-                    </template>
-                  </q-toggle>
-                  <div class="text-caption text-grey-6 q-mt-xs q-ml-xl">
-                    {{ form.is_visible
-                      ? 'Andere Nutzer können dein Profil sehen'
-                      : 'Nur du kannst dein Profil sehen'
-                    }}
-                  </div>
-                </div>
-
-                <div class="q-mt-lg">
-                  <q-btn type="submit" unelevated icon="save" label="Änderungen speichern" size="lg"
-                    class="gradient-btn full-width" no-caps :loading="saving">
-                    <template v-slot:loading>
-                      <q-spinner-dots color="white" />
-                    </template>
-                  </q-btn>
-                </div>
-              </div>
-            </q-form>
-          </q-card>
-
-          <q-card v-if="hasSpotifyData" class="glass-card q-pa-lg q-mt-xl">
-            <div class="section-header row items-center justify-between q-mb-lg">
-              <div class="text-h5 text-weight-bold gradient-text">
-                <q-icon name="music_note" class="q-mr-sm" />
-                Dein Musikprofil
-              </div>
-              <div class="flex q-gutter-sm items-center">
-                <q-badge color="green-6" text-color="white" class="spotify-connected-badge">
-                  <q-icon name="check_circle" size="xs" class="q-mr-xs" />
-                  Spotify verbunden
-                </q-badge>
-                <q-btn unelevated dense icon="sync" label="Sync" color="purple-5" size="sm" no-caps
-                  @click="syncSpotifyData" :loading="syncing">
-                  <q-tooltip>Spotify-Daten neu laden</q-tooltip>
-                </q-btn>
-              </div>
-            </div>
-
-            <div v-if="genres.length" class="q-mb-lg">
-              <div class="section-subtitle q-mb-sm">
-                <q-icon name="category" size="sm" class="q-mr-xs" />
-                Lieblingsgenres
-              </div>
-              <div class="genre-chips">
-                <q-chip v-for="(g, idx) in genres" :key="idx" dense color="deep-purple-5" text-color="white"
-                  class="genre-chip">
-                  <q-icon name="music_note" size="xs" class="q-mr-xs" />
-                  {{ g }}
-                </q-chip>
-              </div>
-            </div>
-
-            <div class="row q-col-gutter-lg">
-              <div class="col-12 col-md-6" v-if="topArtists.length">
-                <div class="music-section">
-                  <div class="section-subtitle q-mb-sm">
-                    <q-icon name="person" size="sm" class="q-mr-xs" />
-                    Top-Künstler:innen
-                  </div>
-                  <q-list class="music-list">
-                    <q-item v-for="(artist, idx) in topArtists.slice(0, 5)" :key="artist.id || idx"
-                      class="music-item q-mb-xs">
-                      <q-item-section avatar>
-                        <q-avatar size="50px" class="artist-avatar">
-                          <img :src="getArtistImage(artist)" :alt="artist.name" />
-                        </q-avatar>
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="music-title text-weight-medium">
-                          {{ artist.name }}
-                        </q-item-label>
-                        <q-item-label caption class="music-caption">
-                          {{ getArtistGenres(artist) }}
-                        </q-item-label>
-                      </q-item-section>
-                      <q-item-section side top>
-                        <div class="column items-end q-gutter-xs">
-                          <q-badge v-if="artist.popularity != null" color="deep-purple-4" text-color="white"
-                            class="popularity-badge">
-                            {{ artist.popularity }}
-                            <q-icon name="trending_up" size="xs" class="q-ml-xs" />
-                          </q-badge>
-                          <div class="rank-badge">
-                            #{{ idx + 1 }}
-                          </div>
-                        </div>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </div>
-              </div>
-
-              <div class="col-12 col-md-6" v-if="topTracks.length">
-                <div class="music-section">
-                  <div class="section-subtitle q-mb-sm">
-                    <q-icon name="library_music" size="sm" class="q-mr-xs" />
-                    Top-Songs
-                  </div>
-                  <q-list class="music-list">
-                    <q-item v-for="(track, idx) in topTracks.slice(0, 5)" :key="track.id || idx"
-                      class="music-item q-mb-xs">
-                      <q-item-section avatar>
-                        <q-avatar size="50px" class="track-avatar" square>
-                          <img :src="getTrackImage(track)" :alt="track.name" />
-                        </q-avatar>
-                      </q-item-section>
-                      <q-item-section>
-                        <q-item-label class="music-title text-weight-medium">
-                          {{ track.name }}
-                        </q-item-label>
-                        <q-item-label caption class="music-caption">
-                          {{ getTrackArtists(track) }}
-                        </q-item-label>
-                      </q-item-section>
-                      <q-item-section side top>
-                        <div class="column items-end q-gutter-xs">
-                          <q-badge v-if="track.popularity != null" color="deep-purple-4" text-color="white"
-                            class="popularity-badge">
-                            {{ track.popularity }}
-                            <q-icon name="trending_up" size="xs" class="q-ml-xs" />
-                          </q-badge>
-                          <div class="rank-badge">
-                            #{{ idx + 1 }}
-                          </div>
-                        </div>
-                      </q-item-section>
-                    </q-item>
-                  </q-list>
-                </div>
-              </div>
-            </div>
-          </q-card>
-
-          <q-card v-else class="glass-card q-pa-lg q-mt-xl">
-            <div class="text-center q-py-lg">
-              <q-icon name="music_off" size="4rem" color="grey-6" class="q-mb-md" />
-              <div class="text-h6 text-grey-4 q-mb-sm">
-                Keine Spotify-Daten verfügbar
-              </div>
-              <div class="text-caption text-grey-6 q-mb-md">
-                Lade deine Spotify-Daten, um dein Musikprofil anzuzeigen
-              </div>
-              <q-btn unelevated icon="sync" label="Spotify-Daten laden" color="purple-5" size="md" no-caps
-                @click="syncSpotifyData" :loading="syncing" />
-            </div>
-          </q-card>
+          </div>
         </div>
+      </section>
+
+      <!-- Main content grid -->
+      <div class="content-grid">
+        <!-- Left column: Settings -->
+        <section class="card settings-card">
+          <div class="card__header">
+            <h2 class="card__title">Settings</h2>
+          </div>
+
+          <q-form @submit.prevent="save" class="settings-form">
+            <div class="field-group">
+              <label class="field-label">Bio</label>
+              <q-input v-model="form.bio" type="textarea" outlined placeholder="Tell us about yourself..." autogrow
+                maxlength="500" counter class="styled-input" :input-style="{ minHeight: '88px' }" />
+            </div>
+
+            <div class="field-group">
+              <label class="field-label">Visibility</label>
+              <div class="visibility-pill" :class="{ 'visibility-pill--active': form.is_visible }">
+                <q-toggle v-model="form.is_visible" color="teal-5" />
+                <div class="visibility-pill__text">
+                  <q-icon :name="form.is_visible ? 'visibility' : 'visibility_off'" size="18px" />
+                  <span>{{ form.is_visible ? 'Public' : 'Private' }}</span>
+                </div>
+              </div>
+              <p class="field-hint">
+                {{ form.is_visible
+                  ? 'Other users can see your profile'
+                  : 'Only you can see your profile'
+                }}
+              </p>
+            </div>
+
+            <q-btn type="submit" unelevated label="Save" no-caps class="save-btn" :loading="saving">
+              <template v-slot:loading>
+                <q-spinner-dots color="white" size="20px" />
+              </template>
+            </q-btn>
+          </q-form>
+
+          <div class="danger-zone">
+            <button class="danger-link" @click="showDeleteDialog">
+              <q-icon name="delete_outline" size="16px" />
+              Delete Account
+            </button>
+          </div>
+        </section>
+
+        <!-- Right column: Music -->
+        <section class="card music-card" v-if="hasSpotifyData">
+          <div class="card__header">
+            <h2 class="card__title">
+              <q-icon
+                name="img:https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Spotify_logo_without_text.svg/168px-Spotify_logo_without_text.svg.png"
+                size="20px" class="q-mr-xs" />
+              Music Profile
+            </h2>
+            <button class="sync-btn" :disabled="syncing" @click="syncSpotifyData">
+              <q-spinner-dots v-if="syncing" color="white" size="14px" />
+              <template v-else>
+                <q-icon name="sync" size="16px" />
+                <span>Sync</span>
+              </template>
+            </button>
+          </div>
+
+          <!-- Genres -->
+          <div v-if="genres.length" class="genre-row">
+            <span v-for="(g, idx) in genres" :key="idx" class="genre-tag">{{ g }}</span>
+          </div>
+
+          <!-- Top Artists & Tracks -->
+          <div class="music-grid">
+            <div v-if="topArtists.length" class="music-col">
+              <h3 class="music-col__title">Top Artists</h3>
+              <div class="track-list">
+                <div v-for="(artist, idx) in topArtists.slice(0, 5)" :key="artist.id || idx" class="track-row">
+                  <span class="track-row__rank">{{ idx + 1 }}</span>
+                  <img class="track-row__img track-row__img--round" :src="getArtistImage(artist)" :alt="artist.name" />
+                  <div class="track-row__info">
+                    <span class="track-row__name">{{ artist.name }}</span>
+                    <span class="track-row__sub">{{ getArtistGenres(artist) }}</span>
+                  </div>
+                  <span v-if="artist.popularity != null" class="track-row__pop">
+                    {{ artist.popularity }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="topTracks.length" class="music-col">
+              <h3 class="music-col__title">Top Tracks</h3>
+              <div class="track-list">
+                <div v-for="(track, idx) in topTracks.slice(0, 5)" :key="track.id || idx" class="track-row">
+                  <span class="track-row__rank">{{ idx + 1 }}</span>
+                  <img class="track-row__img" :src="getTrackImage(track)" :alt="track.name" />
+                  <div class="track-row__info">
+                    <span class="track-row__name">{{ track.name }}</span>
+                    <span class="track-row__sub">{{ getTrackArtists(track) }}</span>
+                  </div>
+                  <span v-if="track.popularity != null" class="track-row__pop">
+                    {{ track.popularity }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- No Spotify data fallback -->
+        <section class="card music-card music-card--empty" v-else>
+          <div class="empty-state">
+            <div class="empty-state__icon">
+              <q-icon name="headphones" size="48px" />
+            </div>
+            <h3 class="empty-state__title">No Spotify Data</h3>
+            <p class="empty-state__text">Connect your Spotify to display your music profile.</p>
+            <button class="sync-btn sync-btn--lg" :disabled="syncing" @click="syncSpotifyData">
+              <q-spinner-dots v-if="syncing" color="white" size="16px" />
+              <template v-else>
+                <q-icon name="sync" size="18px" />
+                <span>Load Spotify Data</span>
+              </template>
+            </button>
+          </div>
+        </section>
       </div>
     </div>
 
+    <!-- Delete Account Dialog -->
     <q-dialog v-model="deleteDialog" persistent>
-      <q-card class="delete-dialog-card">
-        <q-card-section class="text-center q-pb-none">
-          <q-icon name="warning" size="4rem" color="red-5" class="q-mb-md" />
-          <div class="text-h5 text-weight-bold text-red-5 q-mb-sm">
-            Account permanent löschen?
-          </div>
-          <div class="text-body1 text-grey-4 q-mb-md">
-            Diese Aktion kann nicht rückgängig gemacht werden.
-          </div>
-        </q-card-section>
+      <div class="delete-modal">
+        <div class="delete-modal__icon">
+          <q-icon name="warning_amber" size="40px" />
+        </div>
+        <h2 class="delete-modal__title">Delete Account?</h2>
+        <p class="delete-modal__desc">
+          This action is permanent. All data will be irreversibly deleted.
+        </p>
 
-        <q-card-section>
-          <div class="text-body2 text-grey-6 q-mb-md">
-            Alle deine Daten werden permanent gelöscht:
-          </div>
-          <ul class="text-body2 text-grey-6 q-mb-lg delete-list">
-            <li>Profilbild und Bio</li>
-            <li>Spotify-Daten und Musikprofil</li>
-            <li>Alle Matches und Verbindungen</li>
-            <li>Event-Teilnahmen und Aktivitäten</li>
-          </ul>
+        <ul class="delete-modal__list">
+          <li>Profile picture and bio</li>
+          <li>Spotify data and music profile</li>
+          <li>All matches and connections</li>
+          <li>Event participation and activities</li>
+        </ul>
 
-          <div class="q-mb-md">
-            <label class="input-label text-red-4">
-              <q-icon name="edit" class="q-mr-xs" />
-              Gib "LÖSCHEN" ein um zu bestätigen:
-            </label>
-            <q-input v-model="deleteConfirmation" outlined placeholder="LÖSCHEN" class="delete-input"
-              :rules="[val => val === 'LÖSCHEN' || 'Gib LÖSCHEN ein']" />
-          </div>
-        </q-card-section>
+        <div class="delete-modal__confirm">
+          <label class="field-label" style="color: #f87171;">
+            Type <strong>DELETE</strong> to confirm
+          </label>
+          <q-input v-model="deleteConfirmation" outlined placeholder="DELETE" class="styled-input styled-input--danger"
+            :rules="[val => val === 'DELETE' || 'Type DELETE to confirm']" />
+        </div>
 
-        <q-card-actions align="center" class="q-pa-lg q-gutter-md">
-          <q-btn flat label="Abbrechen" color="grey-6" size="lg" class="cancel-btn" @click="closeDeleteDialog"
-            :disable="deleting" />
-          <q-btn unelevated icon="delete_forever" label="Account löschen" color="red-5" size="lg"
-            class="confirm-delete-btn" :disable="deleteConfirmation !== 'LÖSCHEN'" :loading="deleting"
+        <div class="delete-modal__actions">
+          <button class="modal-btn modal-btn--ghost" @click="closeDeleteDialog" :disabled="deleting">
+            Cancel
+          </button>
+          <button class="modal-btn modal-btn--danger" :disabled="deleteConfirmation !== 'DELETE' || deleting"
             @click="deleteAccount">
-            <template v-slot:loading>
-              <q-spinner-dots color="white" />
+            <q-spinner-dots v-if="deleting" color="white" size="16px" />
+            <template v-else>
+              <q-icon name="delete_forever" size="18px" />
+              Delete Account
             </template>
-          </q-btn>
-        </q-card-actions>
-      </q-card>
+          </button>
+        </div>
+      </div>
     </q-dialog>
   </q-page>
 </template>
@@ -388,7 +324,7 @@ const getArtistGenres = (artist) => {
   if (Array.isArray(g) && g.length > 0) {
     return g.slice(0, 2).join(' · ');
   }
-  return 'Keine Genres';
+  return 'No genres';
 };
 
 const getTrackArtists = (track) => {
@@ -396,7 +332,7 @@ const getTrackArtists = (track) => {
   if (Array.isArray(artists) && artists.length > 0) {
     return artists.slice(0, 2).map(a => a.name || a).join(' · ');
   }
-  return 'Unbekannter Künstler';
+  return 'Unknown artist';
 };
 
 
@@ -423,7 +359,7 @@ const doLogout = async () => {
 
     $q.notify({
       type: 'positive',
-      message: 'Erfolgreich abgemeldet',
+      message: 'Successfully logged out',
       position: 'top',
       timeout: 2000
     });
@@ -435,7 +371,7 @@ const doLogout = async () => {
     console.error('Logout error:', error);
     $q.notify({
       type: 'negative',
-      message: 'Fehler beim Abmelden',
+      message: 'Logout failed',
       position: 'top'
     });
   }
@@ -478,7 +414,7 @@ async function save() {
     if (res.ok) {
       $q.notify({
         type: 'positive',
-        message: 'Profil erfolgreich aktualisiert',
+        message: 'Profile updated successfully',
         icon: 'check_circle',
         position: 'top'
       });
@@ -492,7 +428,7 @@ async function save() {
     console.error('Save error:', error);
     $q.notify({
       type: 'negative',
-      message: 'Fehler beim Speichern',
+      message: 'Failed to save',
       icon: 'error',
       position: 'top'
     });
@@ -509,7 +445,7 @@ async function syncSpotifyData() {
 
     $q.notify({
       type: 'positive',
-      message: `✅ ${result.topArtists} Artists, ${result.topTracks} Songs, ${result.genres} Genres geladen`,
+      message: `✅ ${result.topArtists} Artists, ${result.topTracks} Tracks, ${result.genres} Genres loaded`,
       icon: 'check_circle',
       position: 'top',
       timeout: 3000
@@ -521,7 +457,7 @@ async function syncSpotifyData() {
     console.error('Sync error:', error);
     $q.notify({
       type: 'negative',
-      message: 'Fehler beim Laden der Spotify-Daten',
+      message: 'Failed to load Spotify data',
       icon: 'error',
       position: 'top'
     });
@@ -584,7 +520,7 @@ async function uploadAvatar() {
 
     $q.notify({
       type: 'positive',
-      message: 'Profilbild erfolgreich hochgeladen',
+      message: 'Profile picture uploaded successfully',
       icon: 'cloud_done',
       position: 'top'
     });
@@ -592,7 +528,7 @@ async function uploadAvatar() {
     console.error('Upload error:', error);
     $q.notify({
       type: 'negative',
-      message: 'Fehler beim Hochladen',
+      message: 'Upload failed',
       icon: 'error',
       position: 'top'
     });
@@ -616,10 +552,10 @@ const closeDeleteDialog = () => {
 };
 
 const deleteAccount = async () => {
-  if (deleteConfirmation.value !== 'LÖSCHEN') {
+  if (deleteConfirmation.value !== 'DELETE') {
     $q.notify({
       type: 'negative',
-      message: 'Bestätigung erforderlich',
+      message: 'Confirmation required',
       position: 'top'
     });
     return;
@@ -639,7 +575,7 @@ const deleteAccount = async () => {
 
     $q.notify({
       type: 'positive',
-      message: 'Account erfolgreich gelöscht',
+      message: 'Account successfully deleted',
       icon: 'check_circle',
       position: 'top',
       timeout: 3000
@@ -656,7 +592,7 @@ const deleteAccount = async () => {
     console.error('Delete account error:', error);
     $q.notify({
       type: 'negative',
-      message: 'Fehler beim Löschen des Accounts',
+      message: 'Failed to delete account',
       icon: 'error',
       position: 'top'
     });
@@ -667,581 +603,816 @@ const deleteAccount = async () => {
 };
 </script>
 <style scoped>
+/* ─── Foundations ─────────────────────────────────────── */
 .profile-page {
   min-height: 100vh;
   position: relative;
-  background: linear-gradient(135deg, #0a0a0f 0%, #1a0b2e 50%, #2d1b4e 100%);
-  padding: 2rem 1rem;
+  background: #0c0c10;
+  color: #e4e4e7;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-.animated-bg {
+/* Mesh gradient background */
+.bg-mesh {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(99, 102, 241, .12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(236, 72, 153, .08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(20, 184, 166, .06) 0%, transparent 60%);
   pointer-events: none;
+}
+
+.bg-noise {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* ─── Top bar ────────────────────────────────────────── */
+.profile-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  background: rgba(12, 12, 16, .7);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.topbar-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f4f4f5;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.topbar-btn--ghost {
+  background: rgba(255, 255, 255, .06);
+  color: #a1a1aa;
+}
+
+.topbar-btn--ghost:hover {
+  background: rgba(255, 255, 255, .1);
+  color: #f4f4f5;
+}
+
+/* ─── Layout ─────────────────────────────────────────── */
+.profile-layout {
+  position: relative;
+  z-index: 1;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ─── Hero card ──────────────────────────────────────── */
+.hero-card {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.hero-card__bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #312e81 0%, #1e1b4b 40%, #0f172a 100%);
   z-index: 0;
 }
 
-.gradient-orb {
+.hero-card__bg::after {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.3;
-  animation: float 20s infinite ease-in-out;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 50%, rgba(139, 92, 246, .25) 0%, transparent 50%),
+    radial-gradient(circle at 80% 30%, rgba(236, 72, 153, .15) 0%, transparent 50%);
 }
 
-.orb-1 {
-  width: 600px;
-  height: 600px;
-  background: linear-gradient(135deg, #7c3aed, #a78bfa);
-  top: -300px;
-  right: -300px;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #ec4899, #f472b6);
-  bottom: -200px;
-  left: -200px;
-  animation-delay: 7s;
-}
-
-.orb-3 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation-delay: 14s;
-}
-
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  33% {
-    transform: translate(30px, -30px) scale(1.1);
-  }
-
-  66% {
-    transform: translate(-20px, 20px) scale(0.9);
-  }
-}
-
-.profile-container {
-  max-width: 1200px;
-  margin: 0 auto;
+.hero-card__content {
   position: relative;
   z-index: 1;
+  padding: 2.5rem 2rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+/* Avatar */
+.hero-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
 }
 
-.glass-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 48px rgba(124, 58, 237, 0.2);
-  border-color: rgba(124, 58, 237, 0.3);
-}
-
-.gradient-text {
-  background: linear-gradient(135deg, #a78bfa 0%, #ec4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.avatar-container {
-  position: relative;
-  margin: 1rem 0;
-}
-
-.avatar-glow {
-  border: 4px solid rgba(167, 139, 250, 0.3);
-  box-shadow: 0 0 30px rgba(167, 139, 250, 0.5);
-  transition: all 0.3s ease;
-}
-
-.avatar-glow:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 40px rgba(167, 139, 250, 0.7);
-}
-
-.avatar-badge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  background: linear-gradient(135deg, #ec4899, #f472b6);
+.hero-avatar {
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, .15);
+  cursor: pointer;
+  position: relative;
+  transition: transform .25s ease, border-color .25s ease;
+}
+
+.hero-avatar:hover {
+  transform: scale(1.04);
+  border-color: rgba(139, 92, 246, .6);
+}
+
+.hero-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hero-avatar__overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 3px solid rgba(10, 10, 15, 0.9);
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-.modern-btn-outline {
-  border: 2px solid rgba(167, 139, 250, 0.3);
-  color: #a78bfa;
-  background: rgba(167, 139, 250, 0.1);
-  transition: all 0.3s ease;
-}
-
-.modern-btn-outline:hover {
-  background: rgba(167, 139, 250, 0.2);
-  border-color: rgba(167, 139, 250, 0.5);
-  transform: translateY(-2px);
-}
-
-.gradient-btn {
-  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+  background: rgba(0, 0, 0, .5);
+  opacity: 0;
+  transition: opacity .2s ease;
   color: white;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
 }
 
-.gradient-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.6);
+.hero-avatar:hover .hero-avatar__overlay {
+  opacity: 1;
 }
 
-.gradient-btn:active {
-  transform: translateY(0);
-}
-
-.logout-btn {
-  background: rgba(239, 68, 68, 0.1);
-  border: 2px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.logout-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
-  transform: translateY(-2px);
-}
-
-.delete-btn {
-  background: rgba(239, 68, 68, 0.1);
-  border: 2px solid rgba(239, 68, 68, 0.3);
-  color: #f87171;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.delete-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
-  transform: translateY(-2px);
-}
-
-.badges-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.info-badge {
-  padding: 0.5rem 1rem;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  font-weight: 600;
+.upload-pill {
   display: inline-flex;
   align-items: center;
-  border: 2px solid;
-}
-
-.spotify-badge {
-  background: rgba(30, 215, 96, 0.1);
-  color: #1ed760;
-  border-color: rgba(30, 215, 96, 0.3);
-}
-
-.premium-badge {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
-  border-color: rgba(251, 191, 36, 0.3);
-}
-
-.email-badge {
-  background: rgba(99, 102, 241, 0.1);
-  color: #818cf8;
-  border-color: rgba(99, 102, 241, 0.3);
-}
-
-.input-label {
-  display: flex;
-  align-items: center;
-  color: #a78bfa;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.modern-input :deep(.q-field__control) {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  border-color: rgba(167, 139, 250, 0.2);
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(139, 92, 246, .9);
   color: white;
-}
-
-.modern-input :deep(.q-field__control):hover {
-  border-color: rgba(167, 139, 250, 0.4);
-}
-
-.modern-input :deep(.q-field__control):focus-within {
-  border-color: #a78bfa;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.1);
-}
-
-.modern-input :deep(textarea) {
-  color: white;
-}
-
-.modern-input :deep(.q-field__counter) {
-  color: rgba(167, 139, 250, 0.6);
-}
-
-.visibility-toggle {
-  background: rgba(255, 255, 255, 0.03);
-  border: 2px solid rgba(167, 139, 250, 0.2);
-  border-radius: 16px;
-  padding: 1.25rem;
-  transition: all 0.3s ease;
-}
-
-.visibility-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(167, 139, 250, 0.3);
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  color: white;
-  font-size: 1rem;
-}
-
-.hidden {
-  display: none;
-}
-
-/* Spotify Profile Styles */
-.spotify-connected-badge {
-  padding: 0.4rem 0.8rem;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  cursor: pointer;
+  transition: background .2s ease, transform .15s ease;
 }
 
-.section-subtitle {
+.upload-pill:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 1);
+  transform: translateY(-1px);
+}
+
+.upload-pill:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Identity */
+.hero-identity {
   display: flex;
-  align-items: center;
-  color: #a78bfa;
-  font-weight: 600;
-  font-size: 0.95rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
-.genre-chips {
+.hero-name {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: #f4f4f5;
+  line-height: 1.2;
+}
+
+.hero-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.genre-chip {
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(236, 72, 153, 0.9));
-  font-weight: 600;
-  padding: 0.5rem 1rem;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
-  transition: all 0.2s ease;
+.meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, .07);
+  color: #a1a1aa;
+  border: 1px solid rgba(255, 255, 255, .06);
 }
 
-.genre-chip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5);
+.meta-chip--accent {
+  background: rgba(251, 191, 36, .1);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, .15);
 }
 
-.music-section {
-  background: rgba(255, 255, 255, 0.02);
+/* ─── Cards ──────────────────────────────────────────── */
+.content-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.card {
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 16px;
-  padding: 1rem;
-  border: 1px solid rgba(167, 139, 250, 0.1);
+  padding: 1.75rem;
 }
 
-.music-list {
-  background: transparent;
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
 }
 
-.music-item {
-  border-radius: 12px;
-  padding: 0.75rem;
-  transition: all 0.2s ease;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.music-item:hover {
-  background: rgba(167, 139, 250, 0.1);
-  border-color: rgba(167, 139, 250, 0.2);
-  transform: translateX(4px);
-}
-
-.artist-avatar {
-  border: 2px solid rgba(167, 139, 250, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.track-avatar {
-  border: 2px solid rgba(167, 139, 250, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
-}
-
-.music-title {
-  color: white;
-  font-size: 0.95rem;
-}
-
-.music-caption {
-  color: rgba(167, 139, 250, 0.7);
-  font-size: 0.8rem;
-  margin-top: 0.25rem;
-}
-
-.popularity-badge {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  border-radius: 8px;
-}
-
-.rank-badge {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.3), rgba(236, 72, 153, 0.3));
-  color: #a78bfa;
-  padding: 0.25rem 0.5rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
+.card__title {
+  font-size: 1.1rem;
   font-weight: 700;
-  border: 1px solid rgba(167, 139, 250, 0.3);
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: #f4f4f5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.delete-dialog-card {
-  background: rgba(10, 10, 15, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 24px;
+/* ─── Settings card ──────────────────────────────────── */
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #a1a1aa;
+  letter-spacing: 0.01em;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: #71717a;
+  margin: 0;
+}
+
+/* Quasar input overrides */
+.styled-input :deep(.q-field__control) {
+  background: rgba(255, 255, 255, .04);
+  border-radius: 10px;
+  border-color: rgba(255, 255, 255, .08);
+  color: #e4e4e7;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.styled-input :deep(.q-field__control:hover) {
+  border-color: rgba(139, 92, 246, .3);
+}
+
+.styled-input :deep(.q-field--focused .q-field__control) {
+  border-color: rgba(139, 92, 246, .6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, .08);
+}
+
+.styled-input :deep(textarea),
+.styled-input :deep(input) {
+  color: #e4e4e7;
+  font-size: 0.9rem;
+}
+
+.styled-input :deep(.q-field__counter) {
+  color: #52525b;
+}
+
+.styled-input--danger :deep(.q-field__control) {
+  border-color: rgba(239, 68, 68, .25);
+}
+
+.styled-input--danger :deep(.q-field--focused .q-field__control) {
+  border-color: rgba(239, 68, 68, .6);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, .08);
+}
+
+/* Visibility pill */
+.visibility-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .07);
+  transition: all .25s ease;
+}
+
+.visibility-pill--active {
+  border-color: rgba(20, 184, 166, .25);
+  background: rgba(20, 184, 166, .05);
+}
+
+.visibility-pill__text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #d4d4d8;
+}
+
+/* Save button */
+.save-btn {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
   color: white;
-  min-width: 500px;
-  max-width: 600px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  padding: 10px 0;
+  border: none;
+  transition: transform .15s ease, box-shadow .2s ease;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, .25);
 }
 
-.delete-list {
-  padding-left: 1.5rem;
+.save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, .35);
 }
 
-.delete-list li {
+.save-btn:active {
+  transform: translateY(0);
+}
+
+/* Danger zone */
+.danger-zone {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+
+.danger-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #71717a;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color .2s ease;
+}
+
+.danger-link:hover {
+  color: #f87171;
+}
+
+/* ─── Music card ─────────────────────────────────────── */
+.sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  background: rgba(255, 255, 255, .05);
+  color: #a1a1aa;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.sync-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .09);
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, .14);
+}
+
+.sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-btn--lg {
+  padding: 8px 20px;
+  font-size: 0.85rem;
+  border-radius: 12px;
+}
+
+/* Genre row */
+.genre-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 1.5rem;
+}
+
+.genre-tag {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(139, 92, 246, .12);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, .18);
+  transition: all .2s ease;
+}
+
+.genre-tag:hover {
+  background: rgba(139, 92, 246, .2);
+  border-color: rgba(139, 92, 246, .3);
+}
+
+/* Music grid */
+.music-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.music-col__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.75rem 0;
+}
+
+/* Track / artist rows */
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 8px 10px;
+  border-radius: 10px;
+  transition: background .2s ease;
+}
+
+.track-row:hover {
+  background: rgba(255, 255, 255, .04);
+}
+
+.track-row__rank {
+  width: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #52525b;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.track-row__img {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, .05);
+}
+
+.track-row__img--round {
+  border-radius: 50%;
+}
+
+.track-row__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.track-row__name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-row__sub {
+  font-size: 0.75rem;
+  color: #71717a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-row__pop {
+  margin-left: auto;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6d28d9;
+  background: rgba(139, 92, 246, .1);
+  padding: 2px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+/* ─── Empty state ────────────────────────────────────── */
+.music-card--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.empty-state {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.empty-state__icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #52525b;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #a1a1aa;
+  margin: 0;
+}
+
+.empty-state__text {
+  font-size: 0.85rem;
+  color: #71717a;
+  margin: 0;
+  max-width: 260px;
+}
+
+/* ─── Delete Modal ───────────────────────────────────── */
+.delete-modal {
+  background: #18181b;
+  border: 1px solid rgba(239, 68, 68, .15);
+  border-radius: 20px;
+  padding: 2rem 2rem 1.75rem;
+  max-width: 440px;
+  width: 100%;
+  color: #e4e4e7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.delete-modal__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, .1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f87171;
   margin-bottom: 0.5rem;
 }
 
-.delete-input :deep(.q-field__control) {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: white;
+.delete-modal__title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fca5a5;
+  margin: 0 0 0.5rem;
 }
 
-.delete-input :deep(.q-field__control):focus-within {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+.delete-modal__desc {
+  font-size: 0.88rem;
+  color: #a1a1aa;
+  margin: 0 0 1rem;
+  line-height: 1.5;
 }
 
-.cancel-btn {
-  min-width: 120px;
+.delete-modal__list {
+  text-align: left;
+  font-size: 0.82rem;
+  color: #71717a;
+  padding-left: 1.25rem;
+  margin: 0 0 1.25rem;
+  width: 100%;
+  line-height: 1.8;
 }
 
-.confirm-delete-btn {
-  min-width: 160px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
+.delete-modal__confirm {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.delete-modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.modal-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.88rem;
   font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
 }
 
-.confirm-delete-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+.modal-btn--ghost {
+  background: rgba(255, 255, 255, .06);
+  color: #a1a1aa;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .profile-page {
-    padding: 1rem 0.5rem;
-  }
-
-  .glass-card {
-    border-radius: 16px;
-  }
-
-  .avatar-glow {
-    width: 120px !important;
-    height: 120px !important;
-  }
-
-  .gradient-orb {
-    filter: blur(60px);
-  }
-
-  .orb-1 {
-    width: 400px;
-    height: 400px;
-  }
-
-  .orb-2 {
-    width: 300px;
-    height: 300px;
-  }
-
-  .orb-3 {
-    width: 350px;
-    height: 350px;
-  }
-
-  .badges-container {
-    gap: 0.5rem;
-  }
-
-  .info-badge {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.8rem;
-  }
-
-  .music-item {
-    padding: 0.5rem;
-  }
-
-  .artist-avatar,
-  .track-avatar {
-    width: 40px !important;
-    height: 40px !important;
-  }
-
-  .music-title {
-    font-size: 0.85rem;
-  }
-
-  .music-caption {
-    font-size: 0.75rem;
-  }
-
-  .delete-dialog-card {
-    min-width: auto;
-    margin: 1rem;
-  }
-
-  .row.items-center.justify-between {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-
-  .flex.q-gutter-sm {
-    justify-content: space-between;
-  }
+.modal-btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .1);
+  color: #f4f4f5;
 }
 
-/* Loading states */
-.q-spinner-dots {
+.modal-btn--danger {
+  background: #dc2626;
   color: white;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+.modal-btn--danger:hover:not(:disabled) {
+  background: #ef4444;
+  transform: translateY(-1px);
 }
 
-/* Focus states for accessibility */
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: 2px solid #a78bfa;
+.modal-btn--danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.modal-btn--ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Transitions ────────────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}
+
+/* ─── Utility ────────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Focus states ───────────────────────────────────── */
+button:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, .6);
   outline-offset: 2px;
 }
 
-/* Custom scrollbar */
+/* ─── Scrollbar ──────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(167, 139, 250, 0.3);
-  border-radius: 4px;
-  transition: background 0.3s ease;
+  background: rgba(255, 255, 255, .08);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(167, 139, 250, 0.5);
+  background: rgba(255, 255, 255, .14);
 }
 
-.avatar-glow img,
-.artist-avatar img,
-.track-avatar img {
-  object-fit: cover;
-  width: 100%;
-  height: 100%;
+/* ─── Responsive ─────────────────────────────────────── */
+@media (max-width: 800px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .music-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card__content {
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem 1.5rem;
+  }
+
+  .hero-meta {
+    justify-content: center;
+  }
+
+  .hero-name {
+    font-size: 1.5rem;
+  }
+
+  .profile-layout {
+    padding: 1.25rem 1rem 3rem;
+  }
 }
 
-/* Print styles */
-@media print {
-
-  .animated-bg,
-  .gradient-orb {
-    display: none;
+@media (max-width: 480px) {
+  .hero-avatar {
+    width: 96px;
+    height: 96px;
   }
 
-  .glass-card {
-    background: white;
-    color: black;
-    border: 1px solid #ddd;
+  .hero-name {
+    font-size: 1.3rem;
   }
 
-  .gradient-text {
-    -webkit-text-fill-color: black;
-    background: none;
+  .card {
+    padding: 1.25rem;
+    border-radius: 14px;
+  }
+
+  .delete-modal {
+    padding: 1.5rem 1.25rem;
+    border-radius: 16px;
   }
 }
 </style>

@@ -1,160 +1,165 @@
 <template>
   <q-page class="swipe-page">
-    <!-- Animated Background -->
-    <div class="background-gradient">
-      <div class="gradient-orb orb-1"></div>
-      <div class="gradient-orb orb-2"></div>
-      <div class="gradient-orb orb-3"></div>
-    </div>
+    <!-- Subtle background -->
+    <div class="bg-mesh"></div>
 
-    <div class="swipe-container">
-      <!-- Header -->
-      <div class="swipe-header">
-        <div class="header-content">
-          <div class="logo-section">
-            <q-icon name="music_note" size="32px" color="purple-5" />
-            <h1 class="page-title">Discover</h1>
-          </div>
-        </div>
-      </div>
+    <div class="swipe-shell">
+      <!-- Topbar -->
+      <header class="topbar">
+        <span class="topbar__title">Discover</span>
+        <span class="topbar__counter" v-if="cards.length">
+          {{ currentCardIndex + 1 }} / {{ cards.length }}
+        </span>
+      </header>
 
-      <!-- No More Cards Message -->
-      <transition name="fade">
-        <div v-if="currentCardIndex >= cards.length" class="no-cards-container">
-          <div class="no-cards-content">
-            <q-icon name="check_circle" size="80px" color="green-5" />
-            <h2 class="no-cards-title">You're all caught up!</h2>
-            <p class="no-cards-subtitle">Check back later for more matches</p>
-            <q-btn unelevated color="purple-5" label="Back to Home" @click="$router.push({ name: 'Home' })" no-caps
-              class="home-btn" />
+      <!-- Empty state -->
+      <transition name="fade-up">
+        <div v-if="currentCardIndex >= cards.length" class="empty-state">
+          <div class="empty-state__ring">
+            <q-icon name="check_circle_outline" size="56px" />
           </div>
+          <h2 class="empty-state__title">No more profiles</h2>
+          <p class="empty-state__sub">Check back later for new people</p>
+          <button class="pill-btn" @click="$router.push({ name: 'Home' })">
+            Back to Home
+          </button>
         </div>
       </transition>
 
-      <!-- Cards Stack -->
-      <div v-if="currentCardIndex < cards.length" class="cards-stack">
-        <!-- Background cards for depth -->
-        <div v-for="(card, index) in visibleCards" :key="card.id" class="profile-card" :class="{
-          'card-active': index === 0,
-          'card-next': index === 1,
-          'card-behind': index === 2,
-        }" :style="getCardStyle(index)">
-          <!-- Card Content -->
-          <div class="card-image-container">
-            <img :src="card.avatar" :alt="card.name" class="card-image" />
-            <div class="card-gradient-overlay"></div>
+      <!-- Card stack -->
+      <div v-if="currentCardIndex < cards.length" class="stack-wrap">
+        <div class="stack">
+          <div v-for="(card, index) in visibleCards" :key="card.id" class="card" :class="{
+            'card--front': index === 0,
+            'card--mid': index === 1,
+            'card--back': index === 2,
+          }">
+            <!-- Image area -->
+            <div class="card__hero">
+              <img :src="card.avatar" :alt="card.name" class="card__img" />
+              <div class="card__scrim"></div>
 
-            <!-- Match Score Badge -->
-            <div class="match-badge">
-              <q-icon name="auto_awesome" size="18px" />
-              <span>{{ card.matchScore }}% Match</span>
-            </div>
-          </div>
-
-          <!-- Card Info -->
-          <div class="card-info">
-            <div class="card-header">
-              <div class="name-age">
-                <h2 class="card-name">{{ card.name }}</h2>
-                <span v-if="card.age != null" class="card-age">{{ card.age }}</span>
+              <!-- Match score pill -->
+              <div class="score-pill">
+                <q-icon name="auto_awesome" size="14px" />
+                {{ card.matchScore }}%
               </div>
-              <div class="location">
-                <q-icon name="place" size="18px" />
-                <span>{{ card.distance }}</span>
-              </div>
-            </div>
 
-            <div class="card-bio">
-              <p>{{ card.bio }}</p>
-            </div>
-
-            <!-- Music Info -->
-            <div class="music-section" v-if="card.topArtists && card.topArtists.length > 0">
-              <div class="music-header">
-                <q-icon name="music_note" size="20px" color="purple-5" />
-                <span class="music-title">Top Artists</span>
-              </div>
-              <div class="artists-chips">
-                <div v-for="(artist, idx) in card.topArtists.slice(0, 5)" :key="idx" class="artist-chip-small">
-                  {{ artist }}
+              <!-- Name overlay on image -->
+              <div class="card__identity">
+                <h2 class="card__name">
+                  {{ card.name }}<span v-if="card.age != null" class="card__age">, {{ card.age }}</span>
+                </h2>
+                <div class="card__loc">
+                  <q-icon name="near_me" size="13px" />
+                  {{ card.distance }}
                 </div>
               </div>
             </div>
 
-            <div class="music-section" v-else>
-              <div class="text-center text-grey-6 text-caption">
-                <q-icon name="music_off" size="sm" />
-                No artists data
-              </div>
-            </div>
+            <!-- Info section -->
+            <div class="card__body">
+              <!-- Bio -->
+              <p class="card__bio" v-if="card.bio">{{ card.bio }}</p>
 
-            <div class="music-section" v-if="card.genres && card.genres.length > 0">
-              <div class="music-header">
-                <q-icon name="category" size="20px" color="pink-5" />
-                <span class="music-title">Genres</span>
-              </div>
-              <div class="genres-chips">
-                <div v-for="(genre, idx) in card.genres.slice(0, 6)" :key="idx" class="genre-chip-small">
-                  {{ genre }}
+              <!-- Top Artists -->
+              <div class="section" v-if="card.topArtists?.length">
+                <div class="section__label">
+                  <q-icon name="person" size="14px" />
+                  Top Artists
+                </div>
+                <div class="chip-row">
+                  <span v-for="(artist, idx) in card.topArtists.slice(0, 4)" :key="'a-' + idx"
+                    class="chip chip--artist">{{ artist }}</span>
                 </div>
               </div>
-            </div>
 
-            <div class="music-section" v-else>
-              <div class="text-center text-grey-6 text-caption">
-                <q-icon name="category_off" size="sm" />
-                No genres data
+              <!-- Top Tracks -->
+              <div class="section" v-if="card.topTracks?.length">
+                <div class="section__label">
+                  <q-icon name="headphones" size="14px" />
+                  Top Tracks
+                </div>
+                <div class="track-list">
+                  <div v-for="(track, idx) in card.topTracks.slice(0, 3)" :key="'t-' + idx" class="track-row">
+                    <img v-if="track.albumImage" :src="track.albumImage" :alt="track.name" class="track-row__cover" />
+                    <div v-else class="track-row__cover track-row__cover--empty">
+                      <q-icon name="music_note" size="14px" />
+                    </div>
+                    <div class="track-row__info">
+                      <span class="track-row__name">{{ track.name }}</span>
+                      <span class="track-row__artist" v-if="track.artist">{{ track.artist }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Genres -->
+              <div class="section" v-if="card.genres?.length">
+                <div class="section__label">
+                  <q-icon name="tag" size="14px" />
+                  Genres
+                </div>
+                <div class="chip-row">
+                  <span v-for="(genre, idx) in card.genres.slice(0, 5)" :key="'g-' + idx" class="chip chip--genre">{{
+                    genre }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- Action buttons -->
+        <div class="actions">
+          <button class="action-btn action-btn--pass" :disabled="isAnimating" @click="swipeLeft">
+            <q-icon name="close" size="28px" />
+          </button>
 
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-          <q-btn round size="xl" icon="close" color="red-5" class="action-btn dislike-btn" @click="swipeLeft"
-            :disable="isAnimating">
-            <q-tooltip>Dislike</q-tooltip>
-          </q-btn>
-
-          <q-btn round size="xl" icon="favorite" color="green-5" class="action-btn like-btn" @click="swipeRight"
-            :disable="isAnimating">
-            <q-tooltip>Like</q-tooltip>
-          </q-btn>
+          <button class="action-btn action-btn--like" :disabled="isAnimating" @click="swipeRight">
+            <q-icon name="favorite" size="28px" />
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Match Modal -->
+    <!-- Match celebration modal -->
     <q-dialog v-model="showMatchModal" persistent>
-      <q-card class="match-modal">
-        <div class="match-animation">
-          <div class="match-hearts">
-            <q-icon name="favorite" class="heart heart-1" />
-            <q-icon name="favorite" class="heart heart-2" />
-            <q-icon name="favorite" class="heart heart-3" />
+      <div class="match-modal">
+        <!-- Animated particles -->
+        <div class="match-particles">
+          <span v-for="i in 12" :key="i" class="particle" :style="particleStyle(i)"></span>
+        </div>
+
+        <div class="match-modal__content">
+          <!-- Avatars -->
+          <div class="match-avatars">
+            <div class="match-av match-av--me">
+              <img :src="userStore.me?.avatarUrl || 'https://i.pravatar.cc/150?img=1'" alt="You" />
+            </div>
+            <div class="match-heart-ring">
+              <q-icon name="favorite" size="24px" />
+            </div>
+            <div class="match-av match-av--them">
+              <img :src="lastMatchedUser?.avatar" :alt="lastMatchedUser?.name" />
+            </div>
           </div>
-          <h2 class="match-title">It's a Match! 🎉</h2>
-          <p class="match-subtitle">
-            You and {{ lastMatchedUser?.name }} both liked each other
+
+          <h2 class="match-title">It's a Match!</h2>
+          <p class="match-sub">
+            You and <strong>{{ lastMatchedUser?.name }}</strong> both liked each other
           </p>
 
-          <div class="match-avatars">
-            <img :src="userStore.me?.avatarUrl || 'https://i.pravatar.cc/150?img=1'
-              " class="match-avatar" />
-
-            <div class="heart-connector">
-              <q-icon name="favorite" size="40px" color="pink-5" />
-            </div>
-            <img :src="lastMatchedUser.avatar" class="match-avatar" />
-          </div>
-
           <div class="match-actions">
-            <q-btn outline color="grey-7" label="Keep Swiping" @click="closeMatchModal" no-caps class="match-btn" />
-            <q-btn unelevated color="purple-5" label="Send Message" @click="sendMessage" no-caps class="match-btn" />
+            <button class="match-btn match-btn--ghost" @click="closeMatchModal">
+              Keep Swiping
+            </button>
+            <button class="match-btn match-btn--primary" @click="sendMessage">
+              <q-icon name="chat_bubble" size="18px" />
+              Send Message
+            </button>
           </div>
         </div>
-      </q-card>
+      </div>
     </q-dialog>
   </q-page>
 </template>
@@ -177,7 +182,7 @@ const currentCardIndex = ref(0);
 const isAnimating = ref(false);
 const showMatchModal = ref(false);
 const lastMatchedUser = ref(null);
-const currentRoomId = ref(null); // Chat-Room für das Match
+const currentRoomId = ref(null); // Chat room for the match
 
 const chatsStore = useChatsStore();
 
@@ -209,11 +214,35 @@ const toGenres = (value) =>
     .map((genre) => String(genre).trim())
     .filter(Boolean);
 
-// Karten direkt aus den Matches
+const toTrackItems = (value) =>
+  toArray(value)
+    .map((t) => {
+      if (typeof t === "string") return { name: t, artist: "", albumImage: null };
+      return {
+        name: t?.name || "",
+        artist: t?.artist || t?.artists?.[0]?.name || "",
+        albumImage: t?.albumImage || t?.album?.image || t?.album?.images?.[0]?.url || null,
+      };
+    })
+    .filter((t) => t.name);
+
+// Generate random particle styles for match celebration
+const particleStyle = (i) => {
+  const angle = (i / 12) * 360;
+  const delay = (i * 0.08).toFixed(2);
+  const size = 4 + Math.random() * 6;
+  return {
+    '--angle': `${angle}deg`,
+    '--delay': `${delay}s`,
+    '--size': `${size}px`,
+  };
+};
+
+// Cards from matches store
 const cards = computed(() =>
   matchesStore.list.map((m, index) => ({
     id: m.id ?? m.userId ?? `match-${index}`,
-    userId: m.userId ?? m.id ?? m.user?.id, // wichtig für Like-Endpoint
+    userId: m.userId ?? m.id ?? m.user?.id, // needed for Like endpoint
     name: m.displayName ?? m.name ?? "Unknown",
     age: Number.isFinite(Number(m.age ?? m.user?.age))
       ? Number(m.age ?? m.user?.age)
@@ -230,6 +259,9 @@ const cards = computed(() =>
     topArtists: toArtistNames(
       m.topArtists ?? m.top_artists ?? m.spotifyTopArtists ?? m.spotify_top_artists
     ),
+    topTracks: toTrackItems(
+      m.topTracks ?? m.top_tracks ?? m.spotifyTopTracks ?? m.spotify_top_tracks
+    ),
     genres: toGenres(m.genres ?? m.spotifyGenres ?? m.spotify_genres),
     matchScore:
       Number(m.matchScore ?? m.score ?? m.compatibility) > 0
@@ -241,8 +273,6 @@ const cards = computed(() =>
 const visibleCards = computed(() =>
   cards.value.slice(currentCardIndex.value, currentCardIndex.value + 3)
 );
-
-const getCardStyle = () => ({});
 
 const swipeLeft = () => {
   if (isAnimating.value) return;
@@ -274,10 +304,10 @@ const swipeRight = async () => {
   }
 
   try {
-    // 👉 Like ans Backend schicken
+    // Send like to backend
     const result = await matchesStore.like(currentCard.userId);
 
-    // Erwartetes Response-Format vom Backend:
+    // Expected response format from backend:
     // { isMatch: boolean, roomId?: string }
     const isMatch = !!result?.isMatch;
 
@@ -285,7 +315,7 @@ const swipeRight = async () => {
       lastMatchedUser.value = currentCard;
       currentRoomId.value = result.roomId;
 
-      // 🟣 NEU: Chat-Liste aktualisieren
+      // Refresh chat list after match
       await chatsStore.fetchChats();
 
       showMatchModal.value = true;
@@ -339,457 +369,678 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped lang="scss">
+<style scoped>
+/* ─── Page ────────────────────────────────────────────── */
 .swipe-page {
   min-height: 100vh;
-  background: #0a0a0f;
+  background: #09090b;
   position: relative;
   overflow: hidden;
+  color: #e4e4e7;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
 }
 
-.background-gradient {
+.bg-mesh {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  z-index: 0;
   pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 0%, rgba(139, 92, 246, .08) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 100%, rgba(236, 72, 153, .06) 0%, transparent 60%);
 }
 
-.gradient-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.3;
-  animation: floatOrb 20s infinite ease-in-out;
-}
-
-.orb-1 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  top: -10%;
-  right: -10%;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #f093fb, #f5576c);
-  bottom: -5%;
-  left: -5%;
-  animation-delay: -7s;
-}
-
-.orb-3 {
-  width: 350px;
-  height: 350px;
-  background: linear-gradient(135deg, #4facfe, #00f2fe);
-  top: 40%;
-  left: 40%;
-  animation-delay: -14s;
-}
-
-@keyframes floatOrb {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  33% {
-    transform: translate(50px, -50px) scale(1.1);
-  }
-
-  66% {
-    transform: translate(-50px, 50px) scale(0.9);
-  }
-}
-
-.swipe-container {
+/* ─── Shell ───────────────────────────────────────────── */
+.swipe-shell {
   position: relative;
   z-index: 1;
-  max-width: 420px;
+  max-width: 400px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 0 1rem;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
 }
 
-.swipe-header {
-  padding: 0.5rem 0;
+/* ─── Topbar ──────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 0 0.75rem;
   flex-shrink: 0;
 }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo-section {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.page-title {
-  font-size: 2rem;
+.topbar__title {
+  font-size: 1.5rem;
   font-weight: 800;
-  color: white;
+  letter-spacing: -0.03em;
+  color: #f4f4f5;
+}
+
+.topbar__counter {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #52525b;
+  background: rgba(255, 255, 255, .05);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Empty state ─────────────────────────────────────── */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-state__ring {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, .08);
+  border: 2px solid rgba(34, 197, 94, .15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #22c55e;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #d4d4d8;
   margin: 0;
 }
 
-.cards-stack {
-  flex: 1;
-  position: relative;
-  min-height: 700px;
-  margin: 0 auto;
-  width: 100%;
-  padding-bottom: 5.5rem;
+.empty-state__sub {
+  font-size: 0.88rem;
+  color: #71717a;
+  margin: 0;
 }
 
-.profile-card {
+.pill-btn {
+  margin-top: 0.5rem;
+  padding: 10px 24px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(139, 92, 246, .15);
+  color: #a78bfa;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+
+.pill-btn:hover {
+  background: rgba(139, 92, 246, .25);
+}
+
+/* ─── Stack ───────────────────────────────────────────── */
+.stack-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 1rem;
+}
+
+.stack {
+  flex: 1;
+  position: relative;
+  min-height: 580px;
+}
+
+/* ─── Card ────────────────────────────────────────────── */
+.card {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  inset: 0;
   margin: 0 auto;
   width: 100%;
   max-width: 380px;
-  background: rgba(20, 20, 30, 0.98);
-  backdrop-filter: blur(30px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: #18181b;
+  border-radius: 22px;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  transition: transform .35s cubic-bezier(.4, 0, .2, 1),
+    opacity .35s ease;
+  will-change: transform, opacity;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .04) inset,
+    0 20px 50px -12px rgba(0, 0, 0, .7);
+  border: 1px solid rgba(255, 255, 255, .06);
+  display: flex;
+  flex-direction: column;
+}
 
-  &.card-active {
-    z-index: 3;
-    transform: scale(1) translateY(0);
+.card--front {
+  z-index: 3;
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card--mid {
+  z-index: 2;
+  transform: scale(.965) translateY(12px);
+  opacity: .45;
+}
+
+.card--back {
+  z-index: 1;
+  transform: scale(.93) translateY(24px);
+  opacity: .2;
+}
+
+/* ─── Card hero (image area) ─────────────────────────── */
+.card__hero {
+  position: relative;
+  height: 300px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top,
+      #18181b 0%,
+      rgba(24, 24, 27, .85) 30%,
+      rgba(24, 24, 27, .2) 60%,
+      transparent 100%);
+}
+
+/* Score pill */
+.score-pill {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, .08);
+  color: #e9d5ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Identity on image */
+.card__identity {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 1.25rem 1rem;
+  z-index: 2;
+}
+
+.card__name {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  margin: 0;
+  line-height: 1.15;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .5);
+}
+
+.card__age {
+  font-weight: 400;
+  color: rgba(255, 255, 255, .6);
+}
+
+.card__loc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, .45);
+}
+
+/* ─── Card body ──────────────────────────────────────── */
+.card__body {
+  padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.card__body::-webkit-scrollbar {
+  width: 0;
+}
+
+.card__bio {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #a1a1aa;
+  margin: 0;
+}
+
+/* ─── Sections (artists / tracks / genres) ───────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section__label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52525b;
+}
+
+/* Chips */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip--artist {
+  background: rgba(139, 92, 246, .1);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, .15);
+}
+
+.chip--genre {
+  background: rgba(236, 72, 153, .08);
+  color: #f9a8d4;
+  border: 1px solid rgba(236, 72, 153, .12);
+}
+
+/* Track rows */
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .04);
+}
+
+.track-row__cover {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.track-row__cover--empty {
+  background: rgba(255, 255, 255, .06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #52525b;
+}
+
+.track-row__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.track-row__name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e4e4e7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-row__artist {
+  font-size: 0.72rem;
+  color: #71717a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Action buttons ─────────────────────────────────── */
+.actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.25rem 0 0.5rem;
+  flex-shrink: 0;
+}
+
+.action-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.action-btn:active:not(:disabled) {
+  transform: scale(.92);
+}
+
+.action-btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.action-btn--pass {
+  background: rgba(239, 68, 68, .1);
+  color: #f87171;
+  border: 2px solid rgba(239, 68, 68, .2);
+}
+
+.action-btn--pass:hover:not(:disabled) {
+  background: rgba(239, 68, 68, .18);
+  border-color: rgba(239, 68, 68, .35);
+  transform: scale(1.08);
+  box-shadow: 0 0 24px rgba(239, 68, 68, .15);
+}
+
+.action-btn--like {
+  background: rgba(34, 197, 94, .1);
+  color: #4ade80;
+  border: 2px solid rgba(34, 197, 94, .2);
+}
+
+.action-btn--like:hover:not(:disabled) {
+  background: rgba(34, 197, 94, .18);
+  border-color: rgba(34, 197, 94, .35);
+  transform: scale(1.08);
+  box-shadow: 0 0 24px rgba(34, 197, 94, .15);
+}
+
+/* ─── Match modal ────────────────────────────────────── */
+.match-modal {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 28px;
+  padding: 2.5rem 2rem 2rem;
+  max-width: 380px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  color: #e4e4e7;
+}
+
+/* Particles */
+.match-particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  opacity: 0;
+  animation: burst .9s var(--delay) ease-out forwards;
+}
+
+.particle:nth-child(odd) {
+  background: #c084fc;
+}
+
+.particle:nth-child(even) {
+  background: #f472b6;
+}
+
+@keyframes burst {
+  0% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0);
     opacity: 1;
   }
 
-  &.card-next {
-    z-index: 2;
-    transform: scale(0.95) translateY(10px);
-    opacity: 0.5;
-  }
-
-  &.card-behind {
-    z-index: 1;
-    transform: scale(0.9) translateY(20px);
-    opacity: 0.3;
+  100% {
+    transform: translate(-50%, -50%) rotate(var(--angle)) translateY(140px);
+    opacity: 0;
   }
 }
 
-.card-image-container {
+.match-modal__content {
   position: relative;
-  height: 360px;
-  overflow: hidden;
-  border-radius: 20px 20px 0 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
-.card-image {
+/* Avatars */
+.match-avatars {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 1.25rem;
+}
+
+.match-av {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #18181b;
+  position: relative;
+}
+
+.match-av img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.card-gradient-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  background: linear-gradient(to top,
-      rgba(20, 20, 30, 1) 0%,
-      rgba(20, 20, 30, 0.6) 50%,
-      transparent 100%);
+.match-av--them {
+  margin-left: -16px;
 }
 
-.match-badge {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  color: white;
-  padding: 0.4rem 0.9rem;
-  border-radius: 20px;
+.match-heart-ring {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899, #f43f5e);
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 700;
-  font-size: 0.85rem;
-  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
-}
-
-.swipe-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
-  font-size: 3rem;
-  font-weight: 900;
-  letter-spacing: 8px;
-  z-index: 10;
-
-  &.like-overlay {
-    background: rgba(34, 197, 94, 0.3);
-    color: #22c55e;
-    border: 4px solid #22c55e;
-  }
-
-  &.nope-overlay {
-    background: rgba(239, 68, 68, 0.3);
-    color: #ef4444;
-    border: 4px solid #ef4444;
-  }
-}
-
-.card-info {
-  padding: 1.1rem;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.7rem;
-}
-
-.name-age {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-
-.card-name {
-  font-size: 1.5rem;
-  font-weight: 700;
   color: white;
-  margin: 0;
-  line-height: 1;
+  position: relative;
+  z-index: 2;
+  margin-left: -12px;
+  margin-right: -12px;
+  border: 3px solid #18181b;
+  box-shadow: 0 4px 16px rgba(236, 72, 153, .4);
+  animation: heart-pop .5s .3s ease-out both;
 }
 
-.card-age {
-  font-size: 1.2rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 400;
-}
+@keyframes heart-pop {
+  0% {
+    transform: scale(0);
+  }
 
-.location {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.85rem;
-}
+  60% {
+    transform: scale(1.2);
+  }
 
-.card-bio {
-  margin-bottom: 0.9rem;
-
-  p {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
-    line-height: 1.4;
-    margin: 0;
+  100% {
+    transform: scale(1);
   }
 }
 
-.music-section {
-  margin-bottom: 0.9rem;
-
-  &:last-child {
-    margin-bottom: 0.5rem;
-  }
+.match-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.35rem;
+  background: linear-gradient(135deg, #c084fc 0%, #f472b6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.music-header {
+.match-sub {
+  font-size: 0.88rem;
+  color: #71717a;
+  margin: 0 0 1.5rem;
+  line-height: 1.4;
+}
+
+.match-sub strong {
+  color: #d4d4d8;
+}
+
+.match-actions {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.5rem;
-}
-
-.music-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.5);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.artists-chips,
-.genres-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.artist-chip-small,
-.genre-chip-small {
-  padding: 0.4rem 0.75rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 3rem;
-  padding: 0;
-  flex-shrink: 0;
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  z-index: 10;
+  gap: 0.75rem;
   width: 100%;
 }
 
-.no-cards-container {
+.match-btn {
   flex: 1;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 0;
+  border-radius: 14px;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
 }
 
-.no-cards-content {
-  text-align: center;
+.match-btn--ghost {
+  background: rgba(255, 255, 255, .06);
+  color: #a1a1aa;
+}
+
+.match-btn--ghost:hover {
+  background: rgba(255, 255, 255, .1);
+  color: #f4f4f5;
+}
+
+.match-btn--primary {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
   color: white;
+  box-shadow: 0 4px 16px rgba(124, 58, 237, .3);
 }
 
-.no-cards-title {
-  margin: 1rem 0 0.4rem;
+.match-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, .4);
 }
 
-.no-cards-subtitle {
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 1rem;
+/* ─── Transitions ─────────────────────────────────────── */
+.fade-up-enter-active,
+.fade-up-leave-active {
+  transition: opacity .3s ease, transform .3s ease;
 }
 
-.action-btn {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s ease;
-  width: 72px;
-  height: 72px;
-
-  &:hover:not(:disabled) {
-    transform: scale(1.1);
-  }
-
-  &:active:not(:disabled) {
-    transform: scale(0.95);
-  }
-
-  &.dislike-btn {
-    background: #ef4444 !important;
-
-    &:hover:not(:disabled) {
-      background: #dc2626 !important;
-    }
-  }
-
-  &.like-btn {
-    background: #22c55e !important;
-
-    &:hover:not(:disabled) {
-      background: #16a34a !important;
-    }
-  }
+.fade-up-enter-from,
+.fade-up-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
 }
 
-@media (max-width: 600px) {
-  .swipe-container {
-    padding: 0.75rem;
-    gap: 1rem;
+/* ─── Responsive ──────────────────────────────────────── */
+@media (max-width: 480px) {
+  .swipe-shell {
+    padding: 0 0.75rem;
   }
 
-  .page-title {
-    font-size: 1.5rem;
+  .card__hero {
+    height: 260px;
   }
 
-  .swipe-header {
-    margin-bottom: 1rem;
+  .card__name {
+    font-size: 1.4rem;
   }
 
-  .cards-stack {
-    min-height: 620px;
-    padding-bottom: 5rem;
+  .card__body {
+    padding: 0.85rem 1rem 1rem;
   }
 
-  .profile-card {
-    max-width: 100%;
-    border-radius: 18px;
-  }
-
-  .card-image-container {
-    height: 320px;
-    border-radius: 18px 18px 0 0;
-  }
-
-  .card-info {
-    padding: 1rem;
-  }
-
-  .card-name {
-    font-size: 1.35rem;
-  }
-
-  .card-age {
-    font-size: 1.1rem;
-  }
-
-  .location {
-    font-size: 0.8rem;
-  }
-
-  .card-bio p {
-    font-size: 0.85rem;
-  }
-
-  .music-title {
-    font-size: 0.65rem;
-  }
-
-  .artist-chip-small,
-  .genre-chip-small {
-    font-size: 0.7rem;
-    padding: 0.35rem 0.65rem;
-  }
-
-  .action-buttons {
-    gap: 2.5rem;
+  .stack {
+    min-height: 520px;
   }
 
   .action-btn {
-    width: 68px;
-    height: 68px;
+    width: 58px;
+    height: 58px;
   }
 
   .match-modal {
-    padding: 2rem 1.5rem;
+    padding: 2rem 1.5rem 1.75rem;
+    border-radius: 22px;
   }
 
-  .match-title {
-    font-size: 2rem;
+  .match-av {
+    width: 68px;
+    height: 68px;
+  }
+}
+
+@media (min-height: 800px) {
+  .card__hero {
+    height: 340px;
   }
 
-  .match-avatar {
-    width: 100px;
-    height: 100px;
+  .stack {
+    min-height: 640px;
   }
-
 }
 </style>

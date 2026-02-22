@@ -5,7 +5,6 @@ import Like from '../../model/Like.js';
 import { fetchMe } from '../../model/spotifyModel.js';
 
 const router = Router();
-
 async function getCurrentUser(req) {
   const { at } = req.cookies || {};
   if (!at) {
@@ -76,9 +75,10 @@ router.get('/candidates', async (req, res, next) => {
     const result = others.map((u, index) => {
       // Debug: Log raw database data
       console.log(`\n🔍 Raw DB data for ${u.displayName}:`);
-      console.log(`  topArtists: ${typeof u.topArtists} = ${u.topArtists ? JSON.stringify(u.topArtists).substring(0, 100) : 'NULL'}`);
+      console.log(
+        `  topArtists: ${typeof u.topArtists} = ${u.topArtists ? JSON.stringify(u.topArtists).substring(0, 100) : 'NULL'}`,
+      );
       console.log(`  genres: ${typeof u.genres} = ${JSON.stringify(u.genres)}`);
-      
       // Extract artist names from objects
       const artistNames = Array.isArray(u.topArtists)
         ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
@@ -93,6 +93,15 @@ router.get('/candidates', async (req, res, next) => {
         bio: u.bio || 'Music lover',
         distance: 'Nearby',
         topArtists: artistNames,
+        topTracks: Array.isArray(u.topTracks)
+          ? u.topTracks
+              .map((t) => ({
+                name: typeof t === 'string' ? t : t?.name,
+                artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',
+                albumImage: typeof t === 'string' ? null : t?.album?.image || null,
+              }))
+              .filter((t) => t.name)
+          : [],
         genres: Array.isArray(u.genres) ? u.genres : [],
         matchScore: 80,
       };
