@@ -267,7 +267,7 @@ onMounted(async () => {
 .popup-carousel {
   min-width: 240px;
   color: #1a1a1a;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 }
 
 .popup-content {

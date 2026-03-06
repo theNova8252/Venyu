@@ -309,6 +309,23 @@ const handleLogout = () => {
 
 <!-- Unscoped styles for Quasar deep overrides that scoped can't reach -->
 <style>
+/* ========== GLOBAL FONT ========== */
+body,
+#app,
+.q-page,
+.q-layout,
+.q-toolbar,
+.q-btn,
+.q-input,
+.q-card,
+.q-dialog,
+.q-menu,
+.q-list,
+.q-item {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 /* ========== HEADER ========== */
 .glass-header {
   background: #0a0a12 !important;

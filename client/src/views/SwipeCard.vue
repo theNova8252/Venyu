@@ -521,7 +521,7 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   color: #e4e4e7;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 }
 
 .bg-mesh {

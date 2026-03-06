@@ -533,7 +533,7 @@ const completeSetup = () => {
   font-weight: 600;
   color: white;
   margin-bottom: 3rem;
-  font-family: "Courier New", monospace;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
   letter-spacing: -0.5px;
 }
 

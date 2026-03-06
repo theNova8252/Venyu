@@ -609,7 +609,7 @@ const deleteAccount = async () => {
   position: relative;
   background: #0c0c10;
   color: #e4e4e7;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 }
 
 /* Mesh gradient background */
