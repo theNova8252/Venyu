@@ -638,9 +638,9 @@ const deleteAccount = async () => {
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
-  background: rgba(12, 12, 16, .7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(12, 12, 16, .88);
   border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
 

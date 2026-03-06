@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Op } from 'sequelize';
 import User from '../../model/User.js';
 import Like from '../../model/Like.js';
+import EventRsvp from '../../model/eventRSVP.js';
 import { fetchMe } from '../../model/spotifyModel.js';
 
 const router = Router();
@@ -72,17 +73,61 @@ router.get('/candidates', async (req, res, next) => {
     console.log('✅ Candidates found:', others.length);
     console.log('🔍 DEBUG: About to process candidates...');
 
+    // Fetch event RSVPs for all candidate users
+    const otherIds = others.map((u) => u.id);
+    const allRsvps = otherIds.length
+      ? await EventRsvp.findAll({
+          where: { userId: { [Op.in]: otherIds }, interested: true },
+          attributes: ['userId', 'eventId', 'interested', 'going'],
+        })
+      : [];
+
+    // Group RSVPs by userId
+    const rsvpsByUser = {};
+    for (const r of allRsvps) {
+      if (!rsvpsByUser[r.userId]) rsvpsByUser[r.userId] = [];
+      rsvpsByUser[r.userId].push({ eventId: r.eventId, interested: r.interested, going: r.going });
+    }
+
+    // Get me's data for match-score breakdown
+    const meGenres = new Set(Array.isArray(me.genres) ? me.genres : []);
+    const meArtistIds = new Set(
+      (Array.isArray(me.topArtists) ? me.topArtists : []).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean),
+    );
+    // My event RSVPs
+    const myRsvps = await EventRsvp.findAll({
+      where: { userId: me.id, interested: true },
+      attributes: ['eventId'],
+    });
+    const myEventIds = new Set(myRsvps.map((r) => r.eventId));
+
     const result = others.map((u, index) => {
-      // Debug: Log raw database data
-      console.log(`\n🔍 Raw DB data for ${u.displayName}:`);
-      console.log(
-        `  topArtists: ${typeof u.topArtists} = ${u.topArtists ? JSON.stringify(u.topArtists).substring(0, 100) : 'NULL'}`,
-      );
-      console.log(`  genres: ${typeof u.genres} = ${JSON.stringify(u.genres)}`);
-      // Extract artist names from objects
       const artistNames = Array.isArray(u.topArtists)
         ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
         : [];
+
+      const artistIds = Array.isArray(u.topArtists)
+        ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
+        : [];
+
+      const uGenres = Array.isArray(u.genres) ? u.genres : [];
+
+      // Match score breakdown
+      const uGenreSet = new Set(uGenres);
+      const sharedGenres = [...meGenres].filter((g) => uGenreSet.has(g));
+      const genreUnion = new Set([...meGenres, ...uGenreSet]);
+      const genreScore = genreUnion.size === 0 ? 0 : sharedGenres.length / genreUnion.size;
+
+      const uArtistSet = new Set(artistIds);
+      const sharedArtists = [...meArtistIds].filter((a) => uArtistSet.has(a));
+      const artistMax = Math.max(meArtistIds.size, uArtistSet.size);
+      const artistScore = artistMax === 0 ? 0 : sharedArtists.length / artistMax;
+
+      // Event overlap
+      const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
+      const sharedEvents = userEventIds.filter((eid) => myEventIds.has(eid));
+
+      const totalScore = Math.round(genreScore * 50 + artistScore * 30 + (sharedEvents.length > 0 ? 20 : 0));
 
       const candidate = {
         id: u.id,
@@ -102,12 +147,19 @@ router.get('/candidates', async (req, res, next) => {
               }))
               .filter((t) => t.name)
           : [],
-        genres: Array.isArray(u.genres) ? u.genres : [],
-        matchScore: 80,
+        genres: uGenres,
+        eventRsvps: rsvpsByUser[u.id] || [],
+        matchScore: totalScore || 80,
+        matchBreakdown: {
+          genreScore: Math.round(genreScore * 50),
+          sharedGenres,
+          artistScore: Math.round(artistScore * 30),
+          sharedArtists: sharedArtists.length,
+          eventScore: sharedEvents.length > 0 ? 20 : 0,
+          sharedEvents: sharedEvents.length,
+          total: totalScore || 80,
+        },
       };
-      console.log(
-        `  ✅ Output: topArtists=${candidate.topArtists.length}, genres=${candidate.genres.length}`,
-      );
       return candidate;
     });
 

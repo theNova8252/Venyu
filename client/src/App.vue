@@ -2,56 +2,78 @@
   <q-layout view="hHh lpR fFf">
     <!-- HEADER -->
     <q-header elevated class="glass-header" v-if="isAuthenticated">
-      <q-toolbar class="q-px-md">
-        <!-- Left menu button (only on mobile) -->
-        <q-btn flat round dense icon="menu" @click="toggleLeftDrawer" class="menu-btn lt-md" />
+      <q-toolbar class="toolbar-inner">
+        <!-- Left: menu + logo -->
+        <div class="toolbar-left">
+          <q-btn flat round dense icon="menu" @click="toggleLeftDrawer" class="menu-btn lt-md" />
+          <router-link to="/home" class="logo-link">
+            <div class="logo-container">
+              <img src="@/assets/venyuUpscaled.png" alt="Venyu" class="logo-img" />
+            </div>
+          </router-link>
+        </div>
 
-        <!-- Logo -->
-        <q-toolbar-title class="logo-title">
-          <div class="logo-container">
-            <span class="logo-icon">♫</span>
-            <span class="logo-text">venyu</span>
+        <!-- Center: search -->
+        <div class="toolbar-center gt-sm">
+          <q-input dark dense standout v-model="searchQuery" placeholder="Search artists, venues..."
+            class="search-bar">
+            <template v-slot:prepend>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
+
+        <!-- Right: now-playing + actions -->
+        <div class="toolbar-right">
+          <!-- Currently Playing -->
+          <div v-if="nowPlaying?.isPlaying" class="now-playing-pill" @click="showNowPlayingDialog = true">
+            <img v-if="nowPlaying.albumImage" :src="nowPlaying.albumImage" class="np-album" />
+            <q-icon v-else name="music_note" size="16px" />
+            <div class="np-info">
+              <div class="np-track">{{ nowPlaying.trackName }}</div>
+              <div class="np-artist">{{ nowPlaying.artistName }}</div>
+            </div>
+            <div class="np-bars">
+              <span></span><span></span><span></span>
+            </div>
           </div>
-        </q-toolbar-title>
 
-        <q-space />
+          <!-- Notifications -->
+          <q-btn flat round dense icon="notifications_none" class="header-icon-btn">
+            <q-badge color="deep-purple-6" floating rounded>3</q-badge>
+          </q-btn>
 
-        <!-- Search Bar (Desktop) -->
-        <q-input dark dense standout v-model="searchQuery" placeholder="Search artists, venues..."
-          class="search-bar gt-sm">
-          <template v-slot:prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-
-        <q-space />
-
-        <!-- Notifications -->
-        <q-btn flat round dense icon="notifications_none" class="menu-btn">
-          <q-badge color="accent" floating rounded>3</q-badge>
-        </q-btn>
-
-        <!-- Profile Menu -->
-        <q-btn flat round dense class="menu-btn q-ml-sm">
-          <q-avatar size="32px">
-            <img :src="userAvatar" />
-          </q-avatar>
-          <q-menu>
-            <q-list style="min-width: 180px">
-              <q-item clickable v-close-popup :to="{ name: 'ProfileView' }">
+          <!-- Profile Menu -->
+          <q-btn flat round dense class="profile-avatar-btn">
+            <q-avatar size="34px" class="avatar-ring">
+              <img :src="userAvatar" />
+            </q-avatar>
+            <q-menu class="profile-dropdown">
+            <div class="dropdown-header">
+              <q-avatar size="48px" class="dropdown-avatar">
+                <img :src="userAvatar" />
+              </q-avatar>
+              <div class="dropdown-user-info">
+                <div class="dropdown-name">{{ userName }}</div>
+                <div class="dropdown-handle">@{{ userHandle }}</div>
+              </div>
+            </div>
+            <q-separator class="dropdown-sep" />
+            <q-list class="dropdown-list">
+              <q-item clickable v-close-popup :to="{ name: 'ProfileView' }" class="dropdown-item">
                 <q-item-section avatar>
                   <q-icon name="account_circle" />
                 </q-item-section>
                 <q-item-section>Profile</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup>
+              <q-item clickable v-close-popup class="dropdown-item">
                 <q-item-section avatar>
                   <q-icon name="settings" />
                 </q-item-section>
                 <q-item-section>Settings</q-item-section>
               </q-item>
-              <q-separator />
-              <q-item clickable v-close-popup @click="handleLogout">
+              <q-separator class="dropdown-sep" />
+              <q-item clickable v-close-popup @click="handleLogout" class="dropdown-item logout-item">
                 <q-item-section avatar>
                   <q-icon name="logout" />
                 </q-item-section>
@@ -59,7 +81,8 @@
               </q-item>
             </q-list>
           </q-menu>
-        </q-btn>
+          </q-btn>
+        </div>
       </q-toolbar>
     </q-header>
 
@@ -69,23 +92,25 @@
       <q-scroll-area class="fit">
         <div class="drawer-content">
           <!-- User Profile Section -->
-          <div class="user-profile-section q-pa-md">
-            <q-avatar size="56px" class="q-mb-sm">
+          <div class="user-profile-section">
+            <div class="profile-bg-glow"></div>
+            <q-avatar size="64px" class="profile-avatar">
               <img :src="userAvatar" />
             </q-avatar>
-            <div class="text-h6 text-weight-bold">{{ userName }}</div>
+            <div class="profile-name">{{ userName }}</div>
+            <div class="profile-handle">@{{ userHandle }}</div>
           </div>
-
-          <q-separator class="q-my-md" />
 
           <!-- Navigation -->
           <q-list class="nav-list">
+            <div class="nav-section-label">Main</div>
+
             <q-item clickable v-ripple :to="{ name: 'Home' }" exact class="nav-item">
               <q-item-section avatar>
                 <q-icon name="home" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Home</q-item-label>
+                <q-item-label class="nav-label">Home</q-item-label>
               </q-item-section>
             </q-item>
 
@@ -94,7 +119,7 @@
                 <q-icon name="explore" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Discover</q-item-label>
+                <q-item-label class="nav-label">Discover</q-item-label>
               </q-item-section>
             </q-item>
 
@@ -103,10 +128,10 @@
                 <q-icon name="chat" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Chats</q-item-label>
+                <q-item-label class="nav-label">Chats</q-item-label>
               </q-item-section>
               <q-item-section side v-if="unreadMessages > 0">
-                <q-badge color="accent" rounded>{{ unreadMessages }}</q-badge>
+                <q-badge color="deep-purple-6" rounded>{{ unreadMessages }}</q-badge>
               </q-item-section>
             </q-item>
 
@@ -115,18 +140,18 @@
                 <q-icon name="account_circle" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Profile</q-item-label>
+                <q-item-label class="nav-label">Profile</q-item-label>
               </q-item-section>
             </q-item>
 
-            <q-separator class="q-my-md" />
+            <div class="nav-section-label" style="margin-top: 16px">Explore</div>
 
             <q-item clickable v-ripple :to="{ name: 'EventMap' }" class="nav-item">
               <q-item-section avatar>
                 <q-icon name="event" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Events</q-item-label>
+                <q-item-label class="nav-label">Events</q-item-label>
               </q-item-section>
             </q-item>
 
@@ -135,7 +160,7 @@
                 <q-icon name="favorite" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Favorites</q-item-label>
+                <q-item-label class="nav-label">Favorites</q-item-label>
               </q-item-section>
             </q-item>
 
@@ -144,10 +169,16 @@
                 <q-icon name="settings" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="text-weight-medium">Settings</q-item-label>
+                <q-item-label class="nav-label">Settings</q-item-label>
               </q-item-section>
             </q-item>
           </q-list>
+
+          <!-- Drawer Footer -->
+          <div class="drawer-footer">
+            <img src="@/assets/venyuUpscaled.png" alt="venyu" class="drawer-footer-logo" />
+            <span class="drawer-footer-text">find your rhythm</span>
+          </div>
         </div>
       </q-scroll-area>
     </q-drawer>
@@ -164,19 +195,72 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from '@/stores/auth';
+import { api } from '@/api';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+
+// Currently playing state
+const nowPlaying = ref(null);
+const showNowPlayingDialog = ref(false);
+let nowPlayingInterval = null;
+let npTickInterval = null;
+
+const fetchNowPlaying = async () => {
+  if (!auth.isAuthenticated || document.hidden) return;
+  try {
+    const data = await api.getCurrentlyPlaying();
+    if (data) {
+      data._fetchedAt = Date.now();
+      nowPlaying.value = data;
+    } else {
+      nowPlaying.value = null;
+    }
+  } catch {
+    nowPlaying.value = null;
+  }
+};
+
+// Client-side tick: advance progressMs every second so the UI feels live
+const tickProgress = () => {
+  const np = nowPlaying.value;
+  if (!np?.isPlaying || !np.durationMs) return;
+  const elapsed = Date.now() - (np._fetchedAt || Date.now());
+  np.progressMs = Math.min(np.durationMs, (np._baseProgress ?? np.progressMs) + elapsed);
+};
 
 // Initialize auth on app mount
 onMounted(async () => {
   if (!auth.ready) {
     await auth.fetchMe();
   }
+  // Start polling for currently playing every 5s
+  await fetchNowPlaying();
+  if (nowPlaying.value) nowPlaying.value._baseProgress = nowPlaying.value.progressMs;
+  nowPlayingInterval = setInterval(async () => {
+    const prev = nowPlaying.value;
+    await fetchNowPlaying();
+    if (nowPlaying.value) nowPlaying.value._baseProgress = nowPlaying.value.progressMs;
+  }, 5000);
+  // Tick progress every 1s for smooth UI
+  npTickInterval = setInterval(tickProgress, 1000);
+
+  // Pause/resume when tab visibility changes
+  document.addEventListener('visibilitychange', onVisChange);
+});
+
+const onVisChange = () => {
+  if (!document.hidden && auth.isAuthenticated) fetchNowPlaying();
+};
+
+onUnmounted(() => {
+  if (nowPlayingInterval) clearInterval(nowPlayingInterval);
+  if (npTickInterval) clearInterval(npTickInterval);
+  document.removeEventListener('visibilitychange', onVisChange);
 });
 
 const leftDrawerOpen = ref(true);
@@ -211,115 +295,518 @@ const handleLogout = () => {
 
 
 <style scoped>
-.glass-header {
-  background: rgba(18, 18, 25, 0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
-}
-
-.glass-drawer {
-  background: rgba(18, 18, 25, 0.98);
-  backdrop-filter: blur(20px);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.logo-container {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.logo-icon {
-  font-size: 1.6rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.logo-text {
-  font-weight: 800;
-  font-size: 1.3rem;
-  letter-spacing: 0.05em;
-  text-transform: lowercase;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.search-bar {
-  max-width: 400px;
-  border-radius: 24px;
-}
-
-.search-bar :deep(.q-field__control) {
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.menu-btn {
-  transition: all 0.3s ease;
-}
-
-.menu-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.drawer-content {
-  padding: 1rem 0;
-}
-
-.user-profile-section {
-  text-align: center;
-}
-
-.nav-list {
-  padding: 0 0.75rem;
-}
-
-.nav-item {
-  border-radius: 12px;
-  margin-bottom: 0.4rem;
-  transition: all 0.3s ease;
-}
-
-.nav-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-}
-
-.nav-item.q-router-link--active {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
-  border-left: 3px solid #667eea;
-}
-
-/* Fade Transition */
+/* ========== TRANSITIONS ========== */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
 }
 
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
 }
+</style>
 
-/* Mobile Responsive */
-@media (max-width: 1023px) {
-  .logo-text {
-    font-size: 1.1rem;
-  }
+<!-- Unscoped styles for Quasar deep overrides that scoped can't reach -->
+<style>
+/* ========== HEADER ========== */
+.glass-header {
+  background: #0a0a12 !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.08) !important;
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.6) !important;
 }
 
-.user-profile-section .q-avatar img,
-.menu-btn .q-avatar img {
+.toolbar-inner {
+  padding: 0 16px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+/* Toolbar layout sections */
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.toolbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 24px;
+  min-width: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Logo */
+.logo-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-img {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(1.1);
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.logo-link:hover .logo-img {
+  filter: brightness(1.35) drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+  transform: scale(1.04);
+}
+
+/* Search Bar */
+.search-bar {
+  width: 100%;
+  max-width: 400px;
+}
+
+.search-bar .q-field__control {
+  border-radius: 10px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  min-height: 36px !important;
+  transition: all 0.25s ease;
+}
+
+.search-bar .q-field__control:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(139, 92, 246, 0.2) !important;
+}
+
+.search-bar .q-field--focused .q-field__control {
+  background: rgba(139, 92, 246, 0.08) !important;
+  border-color: rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.1);
+}
+
+.search-bar .q-field__prepend .q-icon {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.search-bar .q-placeholder {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* Header Icon Buttons */
+.menu-btn,
+.header-icon-btn {
+  color: rgba(255, 255, 255, 0.55) !important;
+  width: 36px !important;
+  height: 36px !important;
+  transition: all 0.2s ease;
+}
+
+.menu-btn:hover,
+.header-icon-btn:hover {
+  color: #fff !important;
+  background: rgba(139, 92, 246, 0.12) !important;
+}
+
+.header-icon-btn .q-badge {
+  font-size: 9px;
+  min-height: 16px;
+  padding: 0 5px;
+}
+
+/* Profile Avatar Button */
+.profile-avatar-btn {
+  transition: all 0.2s ease;
+}
+
+.avatar-ring {
+  border: 2px solid rgba(139, 92, 246, 0.4) !important;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.avatar-ring img {
   object-fit: cover;
   width: 100%;
   height: 100%;
 }
 
-.user-profile-section .q-avatar {
-  border: 2px solid rgba(255, 255, 255, 0.1);
+.profile-avatar-btn:hover .avatar-ring {
+  border-color: rgba(139, 92, 246, 0.8) !important;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+/* Now Playing Pill */
+.now-playing-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 20px;
+  background: rgba(30, 215, 96, 0.06);
+  border: 1px solid rgba(30, 215, 96, 0.14);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.now-playing-pill:hover {
+  background: rgba(30, 215, 96, 0.12);
+  border-color: rgba(30, 215, 96, 0.28);
+  box-shadow: 0 0 14px rgba(30, 215, 96, 0.08);
+}
+
+.np-album {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.np-info {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.np-track {
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #1ed760;
+  line-height: 1.25;
+}
+
+.np-artist {
+  font-size: 0.62rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(255, 255, 255, 0.4);
+  line-height: 1.2;
+}
+
+.np-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.np-bars span {
+  display: block;
+  width: 2px;
+  background: #1ed760;
+  border-radius: 2px;
+  animation: np-bar-bounce 0.8s ease-in-out infinite alternate;
+}
+
+.np-bars span:nth-child(1) { height: 4px; animation-delay: 0s; }
+.np-bars span:nth-child(2) { height: 8px; animation-delay: 0.2s; }
+.np-bars span:nth-child(3) { height: 3px; animation-delay: 0.4s; }
+
+@keyframes np-bar-bounce {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
+}
+
+/* ========== LEFT DRAWER ========== */
+.glass-drawer,
+.glass-drawer .q-drawer,
+.glass-drawer .q-drawer__content {
+  background: #0a0a12 !important;
+}
+
+aside.glass-drawer {
+  background: #0a0a12 !important;
+  border-right: 1px solid rgba(139, 92, 246, 0.08) !important;
+}
+
+.drawer-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 0;
+}
+
+/* User Profile Section */
+.user-profile-section {
+  position: relative;
+  text-align: center;
+  padding: 28px 20px 20px;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 8px;
+}
+
+.profile-bg-glow {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 120px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(139, 92, 246, 0.2) 0%,
+    rgba(236, 72, 153, 0.08) 40%,
+    transparent 75%
+  );
+  pointer-events: none;
+}
+
+.profile-avatar {
+  border: 2.5px solid rgba(139, 92, 246, 0.35) !important;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+  margin-bottom: 12px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profile-avatar:hover {
+  border-color: rgba(139, 92, 246, 0.6) !important;
+  box-shadow: 0 6px 28px rgba(139, 92, 246, 0.25);
+}
+
+.profile-avatar img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+.profile-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff !important;
+  margin-bottom: 2px;
+  letter-spacing: -0.01em;
+}
+
+.profile-handle {
+  font-size: 12.5px;
+  color: rgba(167, 139, 250, 0.6) !important;
+  font-weight: 500;
+}
+
+/* Navigation */
+.nav-list {
+  padding: 4px 12px;
+  flex: 1;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.28) !important;
+  padding: 14px 14px 6px;
+}
+
+.nav-item {
+  border-radius: 10px;
+  margin-bottom: 2px;
+  min-height: 44px;
+  transition: all 0.2s ease;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.nav-item .q-item__label,
+.nav-item .q-item__section--main {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.nav-item .q-icon {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-size: 21px;
+  transition: color 0.2s ease;
+}
+
+.nav-item:hover {
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+
+.nav-item:hover .q-item__label,
+.nav-item:hover .q-item__section--main {
+  color: #ffffff !important;
+}
+
+.nav-item:hover .q-icon {
+  color: rgba(167, 139, 250, 0.85) !important;
+}
+
+/* Active nav item */
+.nav-item.q-router-link--active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.06) 100%) !important;
+  position: relative;
+}
+
+.nav-item.q-router-link--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background: linear-gradient(180deg, #8b5cf6, #ec4899);
+  border-radius: 0 4px 4px 0;
+}
+
+.nav-item.q-router-link--active .q-item__label,
+.nav-item.q-router-link--active .q-item__section--main {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.nav-item.q-router-link--active .q-icon {
+  color: #a78bfa !important;
+}
+
+/* Drawer Footer */
+.drawer-footer {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.drawer-footer-logo {
+  height: 18px;
+  width: auto;
+  opacity: 0.3;
+  filter: grayscale(20%);
+}
+
+.drawer-footer-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.18);
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1023px) {
+  .logo-img {
+    height: 24px;
+  }
+
+  .toolbar-inner {
+    padding: 0 10px;
+  }
+
+  .toolbar-right {
+    gap: 4px;
+  }
+}
+
+/* Profile dropdown menu (rendered outside component scope via portal) */
+.profile-dropdown.q-menu {
+  background: #13131f !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  border-radius: 16px !important;
+  min-width: 250px !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(139, 92, 246, 0.08) !important;
+  overflow: hidden;
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 16px;
+}
+
+.dropdown-avatar {
+  border: 2px solid rgba(139, 92, 246, 0.35) !important;
+  flex-shrink: 0;
+}
+
+.dropdown-avatar img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+.dropdown-user-info {
+  min-width: 0;
+}
+
+.dropdown-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-handle {
+  font-size: 12px;
+  color: rgba(167, 139, 250, 0.6) !important;
+  font-weight: 500;
+}
+
+.dropdown-sep {
+  background: rgba(255, 255, 255, 0.06) !important;
+  margin: 0 !important;
+}
+
+.dropdown-list {
+  padding: 6px !important;
+}
+
+.dropdown-item {
+  border-radius: 10px !important;
+  min-height: 42px;
+  color: rgba(255, 255, 255, 0.85) !important;
+  transition: all 0.2s ease;
+  margin: 2px 0;
+}
+
+.dropdown-item:hover {
+  background: rgba(139, 92, 246, 0.12) !important;
+  color: #fff !important;
+}
+
+.dropdown-item .q-icon {
+  color: rgba(167, 139, 250, 0.7) !important;
+}
+
+.logout-item:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+.logout-item .q-icon {
+  color: rgba(239, 68, 68, 0.7) !important;
+}
+
+/* Global dark body */
+body,
+.q-page-container {
+  background: #09090b;
 }
 </style>

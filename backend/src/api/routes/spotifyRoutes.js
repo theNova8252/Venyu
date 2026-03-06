@@ -9,20 +9,9 @@ import {
   devices,
   play,
   syncMusicData,
+  currentlyPlaying,
 } from '../../controller/spotifyController.js';
 
-// // currently Playing
-// import { fetchCurrentlyPlaying } from "../../model/spotifyModel.js";
-
-// router.get("/currently-playing", async (req, res, next) => {
-//   try {
-//     const data = await fetchCurrentlyPlaying(req);
-//     res.json(data || { isPlaying: false });
-//   } catch (err) {
-//     next(err);
-//   }
-// });
-// // currently playing end
 const router = express.Router();
 
 router.get('/auth/login', login);
@@ -32,6 +21,7 @@ router.get('/me', me);
 router.post('/auth/logout', logout);
 router.post('/sync', syncMusicData);
 
+router.get('/currently-playing', currentlyPlaying);
 router.get('/player/devices', devices);
 router.post('/player/play', play);
 

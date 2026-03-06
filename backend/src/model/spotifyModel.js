@@ -126,6 +126,9 @@ export async function fetchRecentlyPlayed(accessToken, { limit = 20 } = {}) {
   return spotifyFetch(`${SPOTIFY_API}/me/player/recently-played?${qs.toString()}`, accessToken);
 }
 // ================= CURRENTLY PLAYING =================
+export async function fetchCurrentlyPlaying(accessToken) {
+  return spotifyFetch(`${SPOTIFY_API}/me/player/currently-playing`, accessToken);
+}
 
 // ================= DEVICES / PLAYBACK =================
 export async function fetchDevices(accessToken) {

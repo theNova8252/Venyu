@@ -538,8 +538,7 @@ const completeSetup = () => {
 }
 
 .testimonial {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 2rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -574,8 +573,7 @@ const completeSetup = () => {
 .preferences-content {
   max-width: 900px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.97);
   border-radius: 32px;
   padding: 3rem;
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
@@ -709,8 +707,7 @@ const completeSetup = () => {
 .shape {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.15;
-  animation: floatShape 20s infinite ease-in-out;
+  opacity: 0.12;
 }
 
 .shape-1 {
@@ -719,7 +716,6 @@ const completeSetup = () => {
   background: linear-gradient(135deg, #f093fb, #667eea);
   top: -10%;
   right: -5%;
-  animation-delay: 0s;
 }
 
 .shape-2 {
@@ -728,7 +724,6 @@ const completeSetup = () => {
   background: linear-gradient(135deg, #764ba2, #f093fb);
   bottom: 10%;
   left: -5%;
-  animation-delay: -7s;
 }
 
 .shape-3 {
@@ -737,22 +732,6 @@ const completeSetup = () => {
   background: linear-gradient(135deg, #667eea, #764ba2);
   top: 50%;
   left: 50%;
-  animation-delay: -14s;
-}
-
-@keyframes floatShape {
-  0%,
-  100% {
-    transform: translate(0, 0) rotate(0deg);
-  }
-
-  33% {
-    transform: translate(50px, -50px) rotate(120deg);
-  }
-
-  66% {
-    transform: translate(-50px, 50px) rotate(240deg);
-  }
 }
 
 /* ==================== RESPONSIVE ==================== */

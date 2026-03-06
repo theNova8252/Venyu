@@ -17,7 +17,6 @@
           <!-- Left: Greeting + CTA -->
           <div class="hero-left">
             <div class="hero-badge">
-              <q-icon name="graphic_eq" size="18px" />
               <span>Venyu</span>
             </div>
 
@@ -119,6 +118,30 @@
         </div>
       </section>
 
+      <!-- CURRENTLY PLAYING -->
+      <section v-if="currentlyPlaying?.isPlaying" class="now-playing-banner glass q-pa-md q-mt-lg">
+        <div class="np-banner-inner">
+          <img v-if="currentlyPlaying.albumImage" :src="currentlyPlaying.albumImage" class="np-banner-cover" />
+          <div class="np-banner-info">
+            <div class="np-banner-label">
+              <div class="np-live-dot"></div>
+              Now Playing on Spotify
+            </div>
+            <div class="np-banner-track">{{ currentlyPlaying.trackName }}</div>
+            <div class="np-banner-artist">{{ currentlyPlaying.artistName }}</div>
+            <div class="np-progress">
+              <div class="np-progress-bar">
+                <div class="np-progress-fill" :style="{ width: npProgress + '%' }"></div>
+              </div>
+              <div class="np-progress-time">
+                <span>{{ formatMs(interpolatedProgress) }}</span>
+                <span>{{ formatMs(currentlyPlaying.durationMs) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- MAIN GRID -->
       <section class="main-grid q-mt-xl">
         <!-- Left -->
@@ -127,7 +150,7 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-green">
+                <div class="head-icon">
                   <q-icon name="history" size="20px" />
                 </div>
                 <h3>Recently Played</h3>
@@ -136,29 +159,24 @@
             </div>
 
             <div v-if="loadingRecent" class="q-gutter-sm">
-              <q-skeleton v-for="i in 5" :key="i" height="56px" />
+              <q-skeleton v-for="i in 5" :key="i" height="44px" />
             </div>
 
             <div v-else class="list">
-              <div v-for="(item, idx) in recentlyPlayed" :key="idx" class="list-row track-row">
-                <q-avatar size="48px" class="track-cover">
+              <div v-for="(item, idx) in recentlyPlayed.slice(0, 5)" :key="idx" class="list-row track-row">
+                <q-avatar size="36px" class="track-cover">
                   <img v-if="item.track.album.image" :src="item.track.album.image" />
-                  <div v-else class="initials small">
-                    {{ (item.track.name || '?')[0] }}
-                  </div>
+                  <div v-else class="initials small">{{ (item.track.name || '?')[0] }}</div>
                 </q-avatar>
 
-                <div class="col">
-                  <div class="track-name">{{ item.track.name }}</div>
-                  <div class="muted">
+                <div class="col min-width-0">
+                  <div class="track-name text-ellipsis">{{ item.track.name }}</div>
+                  <div class="muted text-ellipsis" style="font-size:0.75rem">
                     {{item.track.artists.map(a => a.name).join(', ')}}
                   </div>
                 </div>
-                <div class="track-time muted">
-                  {{ formatPlayedAt(item.playedAt) }}
-                </div>
 
-                <q-btn flat round icon="play_arrow" size="sm" @click="playTrack(item.track.uri)" />
+                <div class="track-time muted">{{ formatPlayedAt(item.playedAt) }}</div>
               </div>
 
               <div v-if="!recentlyPlayed.length" class="empty">
@@ -170,42 +188,31 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-purple">
+                <div class="head-icon">
                   <q-icon name="stars" size="20px" />
                 </div>
                 <h3>Your Top Artists</h3>
               </div>
             </div>
 
-            <div v-if="loadingMe" class="q-gutter-sm">
-              <q-skeleton v-for="i in 5" :key="i" height="48px" />
+            <div v-if="loadingMe" class="artist-grid">
+              <div v-for="i in 9" :key="i" class="artist-cell">
+                <q-skeleton type="rect" class="artist-img-skel" />
+                <q-skeleton type="text" width="70%" class="q-mt-xs" />
+              </div>
             </div>
 
-            <div v-else class="list">
-              <div v-for="(artist, idx) in (user.me.topArtists || [])" :key="artist.id || artist.uri || idx"
-                class="list-row">
-                <div class="rank">{{ idx + 1 }}</div>
-
-                <q-avatar size="32px" class="artist-avatar">
+            <div v-else class="artist-grid">
+              <div v-for="(artist, idx) in (user.me?.topArtists || []).slice(0, 9)" :key="artist.id || idx"
+                class="artist-cell">
+                <div class="artist-img">
                   <img v-if="artist.image" :src="artist.image" />
-                  <div v-else class="initials small">
-                    {{ (artist.name || '?')[0] }}
-                  </div>
-                </q-avatar>
-
-                <div class="list-text">{{ artist.name }}</div>
-
-                <div class="artist-followers">
-                  <q-icon name="groups" size="14px" class="muted" />
-                  <span class="muted">{{ formatNumber(artist.followers?.total) }} followers</span>
+                  <div v-else class="initials small">{{ (artist.name || '?')[0] }}</div>
                 </div>
-
-
-
-                <q-icon name="verified" size="16px" class="verified" />
+                <div class="artist-cell-name">{{ artist.name }}</div>
               </div>
 
-              <div v-if="!user.me?.topArtists?.length" class="empty">
+              <div v-if="!user.me?.topArtists?.length" class="empty" style="grid-column: 1 / -1">
                 No top artists yet — sync Spotify to see your vibe.
               </div>
             </div>
@@ -216,7 +223,7 @@
           <div v-if="user.me?.genres?.length" class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-pink">
+                <div class="head-icon">
                   <q-icon name="library_music" size="20px" />
                 </div>
                 <h3>Favorite Genres</h3>
@@ -237,7 +244,7 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-orange">
+                <div class="head-icon">
                   <q-icon name="event_available" size="20px" />
                 </div>
                 <h3>My Events</h3>
@@ -301,7 +308,7 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-pink">
+                <div class="head-icon">
                   <q-icon name="people" size="20px" />
                 </div>
                 <h3>My Matches</h3>
@@ -345,7 +352,7 @@
           <div class="glass q-pa-lg content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon grad-blue">
+                <div class="head-icon">
                   <q-icon name="confirmation_number" size="20px" />
                 </div>
                 <h3>Nearby Events</h3>
@@ -389,10 +396,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useMatchesStore } from '@/stores/matches';
 import { useEventsStore } from '@/stores/events';
+import { api } from '@/api';
 import axios from 'axios';
 
 const user = useUserStore();
@@ -403,6 +411,52 @@ const loadingMe = ref(true);
 const loadingMatches = ref(true);
 const loadingEvents = ref(true);
 const loadingRecent = ref(false);
+
+// Currently playing
+const currentlyPlaying = ref(null);
+let npInterval = null;
+let npTickInterval = null;
+
+const fetchCurrentlyPlaying = async () => {
+  if (document.hidden) return;
+  try {
+    const data = await api.getCurrentlyPlaying();
+    if (data) {
+      data._fetchedAt = Date.now();
+      data._baseProgress = data.progressMs;
+      currentlyPlaying.value = data;
+    } else {
+      currentlyPlaying.value = null;
+    }
+  } catch {
+    currentlyPlaying.value = null;
+  }
+};
+
+// Client-side interpolation: advance progressMs every second
+const tickProgress = () => {
+  const np = currentlyPlaying.value;
+  if (!np?.isPlaying || !np.durationMs) return;
+  const elapsed = Date.now() - (np._fetchedAt || Date.now());
+  np.progressMs = Math.min(np.durationMs, (np._baseProgress ?? np.progressMs) + elapsed);
+};
+
+const npProgress = computed(() => {
+  if (!currentlyPlaying.value?.durationMs) return 0;
+  return Math.min(100, (currentlyPlaying.value.progressMs / currentlyPlaying.value.durationMs) * 100);
+});
+
+const interpolatedProgress = computed(() => {
+  return currentlyPlaying.value?.progressMs ?? 0;
+});
+
+const formatMs = (ms) => {
+  if (!ms) return '0:00';
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
+};
 
 const displayName = computed(() => {
   return (
@@ -504,6 +558,24 @@ onMounted(async () => {
   loadingMe.value = false;
   loadingMatches.value = false;
   loadingEvents.value = false;
+
+  // Poll currently playing every 5s
+  await fetchCurrentlyPlaying();
+  npInterval = setInterval(fetchCurrentlyPlaying, 5000);
+  // Tick progress every 1s for smooth bar
+  npTickInterval = setInterval(tickProgress, 1000);
+
+  document.addEventListener('visibilitychange', onVisChange);
+});
+
+const onVisChange = () => {
+  if (!document.hidden) fetchCurrentlyPlaying();
+};
+
+onUnmounted(() => {
+  if (npInterval) clearInterval(npInterval);
+  if (npTickInterval) clearInterval(npTickInterval);
+  document.removeEventListener('visibilitychange', onVisChange);
 });
 </script>
 
@@ -528,8 +600,7 @@ onMounted(async () => {
   position: absolute;
   border-radius: 999px;
   filter: blur(100px);
-  opacity: .35;
-  animation: float 18s ease-in-out infinite;
+  opacity: .3;
 }
 
 .orb-1 {
@@ -546,7 +617,6 @@ onMounted(async () => {
   left: -120px;
   bottom: -120px;
   background: linear-gradient(135deg, #ec4899, #ef4444);
-  animation-delay: -6s;
 }
 
 .orb-3 {
@@ -555,19 +625,6 @@ onMounted(async () => {
   left: 40%;
   top: 35%;
   background: linear-gradient(135deg, #22d3ee, #3b82f6);
-  animation-delay: -12s;
-}
-
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-
-  50% {
-    transform: translate(40px, -30px) scale(1.08);
-  }
 }
 
 .noise {
@@ -587,16 +644,16 @@ onMounted(async () => {
 
 /* Glass */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(8px);
   border-radius: 22px;
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.10);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(22px);
+  backdrop-filter: blur(10px);
   border-radius: 18px;
 }
 
@@ -631,9 +688,7 @@ onMounted(async () => {
 }
 
 .hero-name {
-  background: linear-gradient(135deg, #fff, #c7d2fe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #fff;
 }
 
 .hero-subtitle {
@@ -649,11 +704,11 @@ onMounted(async () => {
 }
 
 .cta-primary {
-  background: linear-gradient(135deg, #ec4899, #a855f7);
-  color: white;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0f172a;
   padding: .9rem 1.2rem;
   border-radius: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .cta-secondary {
@@ -699,9 +754,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 1.2rem;
-  background: linear-gradient(135deg, #334155, #0f172a);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .initials.small {
@@ -774,36 +829,24 @@ onMounted(async () => {
 }
 
 .head-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.grad-purple {
-  background: linear-gradient(135deg, #7c5cff, #a855f7);
-}
-.grad-green {
-  background: linear-gradient(135deg, #10b981, #059669);
-}
-.grad-orange {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-.grad-pink {
-  background: linear-gradient(135deg, #ec4899, #ef4444);
-}
-
-.grad-blue {
-  background: linear-gradient(135deg, #22d3ee, #3b82f6);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .card-head h3 {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.9);
 }
+
 .track-row {
   cursor: pointer;
   transition: all 0.2s ease;
@@ -820,13 +863,17 @@ onMounted(async () => {
 }
 
 .track-name {
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .track-time {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   white-space: nowrap;
+  opacity: 0.6;
 }
 
 /* Lists */
@@ -839,11 +886,11 @@ onMounted(async () => {
 .list-row {
   display: flex;
   align-items: center;
-  gap: .8rem;
-  padding: .8rem 1rem;
-  border-radius: 14px;
+  gap: .6rem;
+  padding: .45rem .75rem;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .rank {
@@ -864,6 +911,7 @@ onMounted(async () => {
 .verified {
   color: #c084fc;
 }
+
 .event-section {
   margin-bottom: 1rem;
 }
@@ -892,6 +940,7 @@ onMounted(async () => {
 .event-row.small .event-title {
   font-size: 0.9rem;
 }
+
 .match-row,
 .event-row {
   display: flex;
@@ -993,6 +1042,7 @@ onMounted(async () => {
     grid-template-columns: 1fr 1fr;
   }
 }
+
 .artist-followers {
   margin-left: auto;
   display: flex;
@@ -1000,5 +1050,150 @@ onMounted(async () => {
   gap: .35rem;
   font-size: .85rem;
   color: rgba(255, 255, 255, 0.65);
+}
+
+.artist-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+}
+
+.artist-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+  text-align: center;
+  padding: .5rem;
+  border-radius: 14px;
+  transition: background .2s ease, transform .15s ease;
+  cursor: default;
+}
+
+.artist-cell:hover {
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-2px);
+}
+
+.artist-img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.artist-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.artist-img-skel {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+}
+
+.artist-cell-name {
+  font-size: .78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* ── Now Playing Banner ── */
+.now-playing-banner {
+  border: 1px solid rgba(30, 215, 96, 0.2);
+  border-radius: 16px;
+  background: rgba(30, 215, 96, 0.06) !important;
+}
+
+.np-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.np-banner-cover {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.np-banner-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.np-banner-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1ed760;
+  margin-bottom: 4px;
+}
+
+.np-live-dot {
+  width: 6px;
+  height: 6px;
+  background: #1ed760;
+  border-radius: 50%;
+}
+
+.np-banner-track {
+  font-size: 1rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #fff;
+}
+
+.np-banner-artist {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-progress {
+  margin-top: 8px;
+}
+
+.np-progress-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.np-progress-fill {
+  height: 100%;
+  background: #1ed760;
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.np-progress-time {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 2px;
 }
 </style>

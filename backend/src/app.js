@@ -25,6 +25,8 @@ import ChatMessage from './model/ChatMessage.js';
 import Like from './model/Like.js';
 import { fetchMe } from './model/spotifyModel.js';
 
+import EventRsvp from './model/eventRSVP.js';
+
 dotenv.config();
 
 const app = express();
@@ -110,25 +112,83 @@ app.use('/api/events', eventRsvpRoutes);
 app.get('/api/matches/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
+
+    // My data for matching
     const myTopArtists = toArray(me.topArtists);
     const myArtistIds = new Set(myTopArtists.map(getArtistId).filter(Boolean));
+    const myArtistNames = new Set(myTopArtists.map(getArtistName).filter(Boolean).map(n => n.toLowerCase()));
     const myGenres = new Set(toArray(me.genres).map((genre) => String(genre).toLowerCase()));
+
+    // Filter out already liked users
+    const myLikes = await Like.findAll({
+      where: { fromUserId: me.id },
+      attributes: ['toUserId'],
+    });
+    const likedIds = new Set(myLikes.map((l) => String(l.toUserId)));
+
+    // My event RSVPs
+    const myRsvps = await EventRsvp.findAll({
+      where: { userId: me.id, interested: true },
+      attributes: ['eventId'],
+    });
+    const myEventIds = new Set(myRsvps.map((r) => r.eventId));
 
     const others = await User.findAll({
       where: {
-        id: { [Op.ne]: me.id },
+        id: {
+          [Op.and]: [
+            { [Op.ne]: me.id },
+            ...(likedIds.size > 0 ? [{ [Op.notIn]: Array.from(likedIds) }] : []),
+          ],
+        },
         isVisible: true,
       },
     });
+
+    // Fetch event RSVPs for all candidates
+    const otherIds = others.map((u) => u.id);
+    const allRsvps = otherIds.length
+      ? await EventRsvp.findAll({
+          where: { userId: { [Op.in]: otherIds }, interested: true },
+          attributes: ['userId', 'eventId', 'interested', 'going'],
+        })
+      : [];
+
+    const rsvpsByUser = {};
+    for (const r of allRsvps) {
+      if (!rsvpsByUser[r.userId]) rsvpsByUser[r.userId] = [];
+      rsvpsByUser[r.userId].push({ eventId: r.eventId, interested: r.interested, going: r.going });
+    }
 
     const result = others.map((u, index) => {
       const candidateTopArtists = toArray(u.topArtists);
       const candidateGenres = toArray(u.genres).map((genre) => String(genre));
       const topArtists = candidateTopArtists.map(getArtistName).filter(Boolean);
 
-      const sharedArtists = candidateTopArtists.filter((artist) => myArtistIds.has(getArtistId(artist))).length;
-      const sharedGenres = candidateGenres.filter((genre) => myGenres.has(genre.toLowerCase())).length;
-      const matchScore = Math.min(99, 55 + sharedArtists * 10 + sharedGenres * 4);
+      // --- Genre matching (Jaccard similarity) ---
+      const uGenreSet = new Set(candidateGenres.map(g => g.toLowerCase()));
+      const sharedGenresList = [...myGenres].filter((g) => uGenreSet.has(g));
+      const genreUnion = new Set([...myGenres, ...uGenreSet]);
+      const genreRatio = genreUnion.size === 0 ? 0 : sharedGenresList.length / genreUnion.size;
+      const genreScore = Math.round(genreRatio * 50);
+
+      // --- Artist matching ---
+      const uArtistIds = new Set(candidateTopArtists.map(getArtistId).filter(Boolean));
+      const uArtistNames = new Set(candidateTopArtists.map(getArtistName).filter(Boolean).map(n => n.toLowerCase()));
+      // Match by id OR name
+      const sharedById = [...myArtistIds].filter((id) => uArtistIds.has(id)).length;
+      const sharedByName = [...myArtistNames].filter((n) => uArtistNames.has(n)).length;
+      const sharedArtistCount = Math.max(sharedById, sharedByName);
+      const artistMax = Math.max(myArtistIds.size || myArtistNames.size, uArtistIds.size || uArtistNames.size);
+      const artistRatio = artistMax === 0 ? 0 : sharedArtistCount / artistMax;
+      const artistScore = Math.round(artistRatio * 30);
+
+      // --- Event overlap ---
+      const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
+      const sharedEventsList = userEventIds.filter((eid) => myEventIds.has(eid));
+      const eventScore = sharedEventsList.length > 0 ? Math.min(20, sharedEventsList.length * 10) : 0;
+
+      const totalScore = genreScore + artistScore + eventScore;
 
       return {
         id: u.id,
@@ -139,10 +199,30 @@ app.get('/api/matches/candidates', async (req, res, next) => {
         bio: u.bio || 'Music lover 🎵',
         distance: 'Nearby',
         topArtists,
+        topTracks: toArray(u.topTracks)
+          .map((t) => ({
+            name: typeof t === 'string' ? t : t?.name,
+            artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',
+            albumImage: typeof t === 'string' ? null : t?.album?.image || null,
+          }))
+          .filter((t) => t.name),
         genres: candidateGenres,
-        matchScore,
+        eventRsvps: rsvpsByUser[u.id] || [],
+        matchScore: totalScore,
+        matchBreakdown: {
+          genreScore,
+          sharedGenres: sharedGenresList,
+          artistScore,
+          sharedArtists: sharedArtistCount,
+          eventScore,
+          sharedEvents: sharedEventsList.length,
+          total: totalScore,
+        },
       };
     });
+
+    // Sort by score descending
+    result.sort((a, b) => b.matchScore - a.matchScore);
 
     return res.json(result);
   } catch (e) {

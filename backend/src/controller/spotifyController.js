@@ -8,6 +8,7 @@ import {
   fetchTopArtists,
   fetchTopTracks,
   fetchRecentlyPlayed,
+  fetchCurrentlyPlaying,
   fetchDevices,
   startPlayback,
 } from '../model/spotifyModel.js';
@@ -239,6 +240,44 @@ export const logout = async (_req, res, next) => {
 };
 
 // ======================= CURRENTLY PLAYING ===========
+export const currentlyPlaying = async (req, res, next) => {
+  try {
+    const { at } = req.cookies || {};
+    if (!at) return res.status(401).json({ error: 'no_access_token' });
+
+    let accessToken = at;
+
+    // If userId is provided, look up that user's token instead
+    const { userId } = req.query || {};
+    if (userId) {
+      const targetUser = await User.findByPk(userId);
+      if (!targetUser || !targetUser.accessToken) {
+        return res.json({ isPlaying: false });
+      }
+      accessToken = targetUser.accessToken;
+    }
+
+    const data = await fetchCurrentlyPlaying(accessToken);
+
+    if (!data || !data.item) {
+      return res.json({ isPlaying: false });
+    }
+
+    return res.json({
+      isPlaying: data.is_playing ?? false,
+      trackName: data.item.name ?? null,
+      artistName: (data.item.artists || []).map((a) => a.name).join(', '),
+      albumName: data.item.album?.name ?? null,
+      albumImage: data.item.album?.images?.[0]?.url ?? null,
+      trackUri: data.item.uri ?? null,
+      progressMs: data.progress_ms ?? 0,
+      durationMs: data.item.duration_ms ?? 0,
+    });
+  } catch (e) {
+    console.error('currentlyPlaying error:', e?.message || e);
+    return res.json({ isPlaying: false });
+  }
+};
 
 // ======================= DEVICES =====================
 export const devices = async (req, res) => {
@@ -307,10 +346,11 @@ export const syncMusicData = async (req, res, next) => {
     console.log('🔄 Syncing music data for user:', user.displayName);
 
     // Fetch fresh data from Spotify
-    const [topArtistsRes, topTracksRes, meProfile] = await Promise.all([
+    const [topArtistsRes, topTracksRes, meProfile, recentlyPlayedRes] = await Promise.all([
       fetchTopArtists(at, { timeRange: 'medium_term', limit: 20 }),
       fetchTopTracks(at, { timeRange: 'medium_term', limit: 20 }),
       fetchMe(at),
+      fetchRecentlyPlayed(at, { limit: 20 }),
     ]);
 
     const topArtists = (topArtistsRes?.items || []).map((a) => ({
@@ -346,11 +386,31 @@ export const syncMusicData = async (req, res, next) => {
     topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
     const genres = Array.from(genresSet);
 
+    const recentlyPlayed = (recentlyPlayedRes?.items || []).map((item) => ({
+      playedAt: item.played_at,
+      track: {
+        id: item.track.id,
+        name: item.track.name,
+        uri: item.track.uri,
+        previewUrl: item.track.preview_url,
+        album: {
+          id: item.track.album?.id,
+          name: item.track.album?.name,
+          image: item.track.album?.images?.[0]?.url ?? null,
+        },
+        artists: (item.track.artists || []).map((a) => ({
+          id: a.id,
+          name: a.name,
+        })),
+      },
+    }));
+
     console.log(`  ✅ Found ${topArtists.length} artists, ${genres.length} genres`);
 
     await user.update({
       topArtists,
       topTracks,
+      recentlyPlayed,
       genres,
       avatarUrl: meProfile.images?.[0]?.url ?? user.avatarUrl, // Update avatar too
     });

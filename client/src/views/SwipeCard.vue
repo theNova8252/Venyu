@@ -40,9 +40,42 @@
               <div class="card__scrim"></div>
 
               <!-- Match score pill -->
-              <div class="score-pill">
+              <div class="score-pill" @mouseenter="hoveredScoreCardId = card.id" @mouseleave="hoveredScoreCardId = null" @click.stop="hoveredScoreCardId = hoveredScoreCardId === card.id ? null : card.id">
                 <q-icon name="auto_awesome" size="14px" />
                 {{ card.matchScore }}%
+
+                <!-- Score breakdown tooltip -->
+                <transition name="tooltip-fade">
+                  <div v-if="hoveredScoreCardId === card.id" class="score-tooltip" @click.stop>
+                    <div class="st-title">Match Breakdown</div>
+                    <div class="st-row">
+                      <span class="st-label"><q-icon name="library_music" size="12px" /> Genres</span>
+                      <span class="st-val">{{ card.matchBreakdown?.genreScore ?? 0 }}/50</span>
+                    </div>
+                    <div class="st-detail" v-if="card.matchBreakdown?.sharedGenres?.length">
+                      {{ card.matchBreakdown.sharedGenres.slice(0, 4).join(', ') }}
+                    </div>
+                    <div class="st-row">
+                      <span class="st-label"><q-icon name="person" size="12px" /> Artists</span>
+                      <span class="st-val">{{ card.matchBreakdown?.artistScore ?? 0 }}/30</span>
+                    </div>
+                    <div class="st-detail" v-if="card.matchBreakdown?.sharedArtists">
+                      {{ card.matchBreakdown.sharedArtists }} shared artist{{ card.matchBreakdown.sharedArtists !== 1 ? 's' : '' }}
+                    </div>
+                    <div class="st-row">
+                      <span class="st-label"><q-icon name="event" size="12px" /> Events</span>
+                      <span class="st-val">{{ card.matchBreakdown?.eventScore ?? 0 }}/20</span>
+                    </div>
+                    <div class="st-detail" v-if="card.matchBreakdown?.sharedEvents">
+                      {{ card.matchBreakdown.sharedEvents }} shared event{{ card.matchBreakdown.sharedEvents !== 1 ? 's' : '' }}
+                    </div>
+                    <div class="st-divider"></div>
+                    <div class="st-row st-total">
+                      <span class="st-label">Total</span>
+                      <span class="st-val">{{ card.matchScore }}%</span>
+                    </div>
+                  </div>
+                </transition>
               </div>
 
               <!-- Name overlay on image -->
@@ -59,6 +92,27 @@
 
             <!-- Info section -->
             <div class="card__body">
+              <!-- Currently Playing -->
+              <div class="section np-section" v-if="card.currentlyPlaying?.isPlaying">
+                <div class="section__label np-label">
+                  <div class="np-dot"></div>
+                  Listening Now
+                </div>
+                <div class="np-row">
+                  <img v-if="card.currentlyPlaying.albumImage" :src="card.currentlyPlaying.albumImage" class="np-cover" />
+                  <div v-else class="np-cover np-cover--empty">
+                    <q-icon name="music_note" size="16px" />
+                  </div>
+                  <div class="np-details">
+                    <span class="np-name">{{ card.currentlyPlaying.trackName }}</span>
+                    <span class="np-artist">{{ card.currentlyPlaying.artistName }}</span>
+                  </div>
+                  <div class="np-eq">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Bio -->
               <p class="card__bio" v-if="card.bio">{{ card.bio }}</p>
 
@@ -103,6 +157,22 @@
                 <div class="chip-row">
                   <span v-for="(genre, idx) in card.genres.slice(0, 5)" :key="'g-' + idx" class="chip chip--genre">{{
                     genre }}</span>
+                </div>
+              </div>
+
+              <!-- Events -->
+              <div class="section" v-if="card.eventRsvps?.length">
+                <div class="section__label">
+                  <q-icon name="event" size="14px" />
+                  Events
+                </div>
+                <div class="event-list">
+                  <div v-for="(ev, idx) in cardEvents(card)" :key="'ev-' + idx" class="event-chip" :class="{ 'event-chip--shared': ev.shared }">
+                    <q-icon :name="ev.going ? 'check_circle' : 'star'" size="13px" />
+                    <span class="event-chip__title">{{ ev.title }}</span>
+                    <span class="event-chip__date" v-if="ev.date">{{ formatEventDate(ev.date) }}</span>
+                    <span v-if="ev.shared" class="event-chip__shared">You too!</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -165,21 +235,74 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 
 import { useQuasar } from "quasar";
 import { useUserStore } from "@/stores/user";
 import { useRouter } from "vue-router";
 import { useMatchesStore } from "@/stores/matches";
 import { useChatsStore } from "@/stores/chats";
+import { useEventsStore } from "@/stores/events";
+import { api } from "@/api";
 
 const $q = useQuasar();
 const userStore = useUserStore();
 const router = useRouter();
 const matchesStore = useMatchesStore();
+const eventsStore = useEventsStore();
 
 const currentCardIndex = ref(0);
 const isAnimating = ref(false);
+const hoveredScoreCardId = ref(null);
+
+// ── Currently playing polling for visible cards ──
+const nowPlayingMap = ref({}); // userId -> { isPlaying, trackName, ... }
+let npPollInterval = null;
+
+const fetchNowPlayingForVisible = async () => {
+  if (document.hidden) return;
+  const visible = visibleCards.value;
+  if (!visible?.length) return;
+
+  // Only poll the front card to minimize requests
+  const frontCard = visible[0];
+  if (!frontCard?.userId) return;
+
+  try {
+    const data = await api.getCurrentlyPlaying(frontCard.userId);
+    if (data) {
+      nowPlayingMap.value[frontCard.userId] = data;
+      // Also update in the store so the card computed picks it up
+      const m = matchesStore.list.find((x) => x.id === frontCard.userId || x.userId === frontCard.userId);
+      if (m) m.currentlyPlaying = data;
+    }
+  } catch {
+    // silent
+  }
+};
+
+// ── Event helpers ──
+const cardEvents = (card) => {
+  if (!card.eventRsvps?.length) return [];
+  return card.eventRsvps.map((rsvp) => {
+    const storeEvent = eventsStore.list.find((e) => String(e.id) === String(rsvp.eventId));
+    const shared = eventsStore.isInterested(rsvp.eventId) || eventsStore.isGoing(rsvp.eventId);
+    return {
+      eventId: rsvp.eventId,
+      title: storeEvent?.title || storeEvent?.name || `Event`,
+      date: storeEvent?.date || null,
+      going: rsvp.going,
+      interested: rsvp.interested,
+      shared,
+    };
+  });
+};
+
+const formatEventDate = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
 const showMatchModal = ref(false);
 const lastMatchedUser = ref(null);
 const currentRoomId = ref(null); // Chat room for the match
@@ -264,9 +387,12 @@ const cards = computed(() =>
     ),
     genres: toGenres(m.genres ?? m.spotifyGenres ?? m.spotify_genres),
     matchScore:
-      Number(m.matchScore ?? m.score ?? m.compatibility) > 0
+      Number(m.matchScore ?? m.score ?? m.compatibility) >= 0
         ? Number(m.matchScore ?? m.score ?? m.compatibility)
-        : 80,
+        : 0,
+    matchBreakdown: m.matchBreakdown ?? null,
+    eventRsvps: m.eventRsvps ?? [],
+    currentlyPlaying: m.currentlyPlaying ?? nowPlayingMap.value[m.userId ?? m.id] ?? null,
   }))
 );
 
@@ -363,9 +489,27 @@ onMounted(async () => {
   if (!userStore.me) {
     await userStore.fetchMe();
   }
+  // Load events so we can resolve event titles
+  if (!eventsStore.list.length) {
+    eventsStore.fetchNearby();
+  }
   // Force refresh to avoid cached data
   await matchesStore.fetchMatches(true);
-  matchesStore.connectNowPlayingWS();
+
+  // Poll currently playing for visible card every 5s
+  await fetchNowPlayingForVisible();
+  npPollInterval = setInterval(fetchNowPlayingForVisible, 5000);
+
+  document.addEventListener('visibilitychange', onVisChange);
+});
+
+const onVisChange = () => {
+  if (!document.hidden) fetchNowPlayingForVisible();
+};
+
+onUnmounted(() => {
+  if (npPollInterval) clearInterval(npPollInterval);
+  document.removeEventListener('visibilitychange', onVisChange);
 });
 </script>
 
@@ -512,7 +656,6 @@ onMounted(async () => {
   pointer-events: none;
   transition: transform .35s cubic-bezier(.4, 0, .2, 1),
     opacity .35s ease;
-  will-change: transform, opacity;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, .04) inset,
     0 20px 50px -12px rgba(0, 0, 0, .7);
@@ -575,13 +718,93 @@ onMounted(async () => {
   gap: 4px;
   padding: 5px 12px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, .45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, .55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   border: 1px solid rgba(255, 255, 255, .08);
   color: #e9d5ff;
   font-size: 0.78rem;
   font-weight: 700;
+  cursor: pointer;
+  z-index: 5;
+  transition: background .2s ease;
+}
+
+.score-pill:hover {
+  background: rgba(0, 0, 0, .65);
+}
+
+/* Score tooltip */
+.score-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 200px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(24, 24, 27, 0.97);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+  z-index: 10;
+  font-weight: 400;
+  cursor: default;
+}
+
+.st-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a78bfa;
+  margin-bottom: 8px;
+}
+
+.st-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.st-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #a1a1aa;
+}
+
+.st-val {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #e4e4e7;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-detail {
+  font-size: 0.65rem;
+  color: #71717a;
+  padding: 0 0 4px 18px;
+  line-height: 1.3;
+}
+
+.st-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, .08);
+  margin: 6px 0;
+}
+
+.st-total .st-label { color: #e4e4e7; font-weight: 700; }
+.st-total .st-val { color: #a78bfa; font-size: 0.85rem; }
+
+.tooltip-fade-enter-active, .tooltip-fade-leave-active {
+  transition: opacity .2s ease, transform .2s ease;
+}
+.tooltip-fade-enter-from, .tooltip-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 /* Identity on image */
@@ -1042,5 +1265,151 @@ onMounted(async () => {
   .stack {
     min-height: 640px;
   }
+}
+
+/* ── Currently Playing on Card ── */
+.np-section {
+  background: rgba(30, 215, 96, 0.08);
+  border: 1px solid rgba(30, 215, 96, 0.18);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 4px;
+}
+
+.np-label {
+  color: #1ed760 !important;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.np-dot {
+  width: 5px;
+  height: 5px;
+  background: #1ed760;
+  border-radius: 50%;
+}
+
+.np-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.np-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.np-cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.np-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.np-name {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-artist {
+  display: block;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.np-eq span {
+  display: block;
+  width: 2.5px;
+  background: #1ed760;
+  border-radius: 1px;
+}
+
+.np-eq span:nth-child(1) { height: 5px; }
+.np-eq span:nth-child(2) { height: 10px; }
+.np-eq span:nth-child(3) { height: 3px; }
+
+/* ── Event section on cards ── */
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, .08);
+  border: 1px solid rgba(139, 92, 246, .15);
+  color: #c4b5fd;
+  font-size: 0.75rem;
+  transition: all .2s ease;
+}
+
+.event-chip--shared {
+  background: rgba(236, 72, 153, .1);
+  border-color: rgba(236, 72, 153, .25);
+  color: #f9a8d4;
+}
+
+.event-chip__title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.event-chip__date {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, .35);
+  flex-shrink: 0;
+}
+
+.event-chip__shared {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ec4899;
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(236, 72, 153, .15);
 }
 </style>

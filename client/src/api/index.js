@@ -55,7 +55,8 @@ export const api = {
 
   // Spotify
   async getCurrentlyPlaying(userId) {
-    return baseFetch(`/api/spotify/currently-playing?userId=${userId}`);
+    const qs = userId ? `?userId=${userId}` : '';
+    return baseFetch(`/api/spotify/currently-playing${qs}`);
   },
 
   async syncSpotifyData() {

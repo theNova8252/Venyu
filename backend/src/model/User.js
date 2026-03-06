@@ -25,6 +25,7 @@ class User extends Model {
       top_artists: values.topArtists, // Keep both for compatibility
       topTracks: values.topTracks,
       top_tracks: values.topTracks, // Keep both for compatibility
+      recentlyPlayed: values.recentlyPlayed,
       genres: values.genres,
       createdAt: values.createdAt,
       updatedAt: values.updatedAt,
@@ -49,6 +50,7 @@ User.init(
     isVisible: { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_visible' },
     topArtists: { type: DataTypes.JSONB, field: 'top_artists' },
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
+    recentlyPlayed: { type: DataTypes.JSONB, field: 'recently_played' },
     genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
   },
   {
