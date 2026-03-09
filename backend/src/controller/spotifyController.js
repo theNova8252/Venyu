@@ -13,12 +13,13 @@ import {
   startPlayback,
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
+import SpotifyToken from '../model/SpotifyToken.js';
+import SpotifyData from '../model/SpotifyData.js';
 
 dotenv.config();
 
 const isDev = (process.env.MODE || process.env.NODE_ENV) !== 'production';
 
-// In Dev (http://127.0.0.1) müssen Cookies ohne secure+sameSite none laufen.
 const COOKIE_OPTS_BASE = {
   httpOnly: true,
   sameSite: isDev ? 'lax' : 'none',
@@ -249,6 +250,7 @@ export const callback = async (req, res) => {
       avatarUrl: meProfile.images?.[0]?.url ?? null,
       country: meProfile.country ?? null,
       product: meProfile.product ?? null,
+<<<<<<< HEAD
       age: signupState.profile.age,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
@@ -257,15 +259,35 @@ export const callback = async (req, res) => {
       topTracks,
       recentlyPlayed,
       genres,
+=======
+>>>>>>> 53f80857782363d717655499852d583e9e28e7a5
     };
 
-    if (user) await user.update(userPayload);
-    else {
+    if (user) {
+      await user.update(userPayload);
+    } else {
       user = await User.create({
         ...userPayload,
         spotifyId: meProfile.id,
       });
     }
+
+    // Upsert auth tokens into spotify_tokens
+    await SpotifyToken.upsert({
+      userId: user.id,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? (await SpotifyToken.findByPk(user.id))?.refreshToken ?? null,
+      tokenExpiresAt: expiresAt,
+    });
+
+    // Upsert music data into spotify_data
+    await SpotifyData.upsert({
+      userId: user.id,
+      topArtists,
+      topTracks,
+      recentlyPlayed,
+      genres,
+    });
 
     // cookies
     res.cookie('at', tokens.access_token, {
@@ -299,6 +321,8 @@ export const me = async (req, res, next) => {
     const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
+    const spotifyData = await SpotifyData.findByPk(user.id);
+
     return res.json({
       id: user.id,
       spotifyId: user.spotifyId,
@@ -310,6 +334,7 @@ export const me = async (req, res, next) => {
       avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
+<<<<<<< HEAD
       age: user.age,
       bio: user.bio,
       isVisible: user.isVisible,
@@ -317,6 +342,12 @@ export const me = async (req, res, next) => {
       topTracks: user.topTracks,
       recentlyPlayed: user.recentlyPlayed,
       genres: user.genres,
+=======
+      topArtists: spotifyData?.topArtists ?? [],
+      topTracks: spotifyData?.topTracks ?? [],
+      recentlyPlayed: spotifyData?.recentlyPlayed ?? [],
+      genres: spotifyData?.genres ?? [],
+>>>>>>> 53f80857782363d717655499852d583e9e28e7a5
     });
   } catch (e) {
     return next(e);
@@ -334,17 +365,20 @@ export const refresh = async (req, res, next) => {
 
     const data = await refreshAccessToken(rt);
 
-    // save to user
+    // save to spotify_tokens
     const profile = await fetchMe(data.access_token);
     const expiresAt = new Date(Date.now() + data.expires_in * 1000);
+    const user = await User.findOne({ where: { spotifyId: profile.id } });
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
 
-    const updates = {
+    const tokenUpdates = {
+      userId: user.id,
       accessToken: data.access_token,
       tokenExpiresAt: expiresAt,
     };
-    if (data.refresh_token) updates.refreshToken = data.refresh_token;
+    if (data.refresh_token) tokenUpdates.refreshToken = data.refresh_token;
 
-    await User.update(updates, { where: { spotifyId: profile.id } });
+    await SpotifyToken.upsert(tokenUpdates);
 
     // cookies
     if (data.refresh_token) {
@@ -391,11 +425,11 @@ export const currentlyPlaying = async (req, res, next) => {
     // If userId is provided, look up that user's token instead
     const { userId } = req.query || {};
     if (userId) {
-      const targetUser = await User.findByPk(userId);
-      if (!targetUser || !targetUser.accessToken) {
+      const targetToken = await SpotifyToken.findByPk(userId);
+      if (!targetToken || !targetToken.accessToken) {
         return res.json({ isPlaying: false });
       }
-      accessToken = targetUser.accessToken;
+      accessToken = targetToken.accessToken;
     }
 
     const data = await fetchCurrentlyPlaying(accessToken);
@@ -548,13 +582,20 @@ export const syncMusicData = async (req, res, next) => {
 
     console.log(`  ✅ Found ${topArtists.length} artists, ${genres.length} genres`);
 
-    await user.update({
+    // Update music data in spotify_data table
+    await SpotifyData.upsert({
+      userId: user.id,
       topArtists,
       topTracks,
       recentlyPlayed,
       genres,
-      avatarUrl: meProfile.images?.[0]?.url ?? user.avatarUrl, // Update avatar too
     });
+
+    // Update avatar on user profile if changed
+    const newAvatar = meProfile.images?.[0]?.url ?? null;
+    if (newAvatar && newAvatar !== user.avatarUrl) {
+      await user.update({ avatarUrl: newAvatar });
+    }
 
     return res.json({
       success: true,

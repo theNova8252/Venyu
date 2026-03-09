@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Op } from 'sequelize';
 import User from '../../model/User.js';
+import SpotifyData from '../../model/SpotifyData.js';
 import Like from '../../model/Like.js';
 import EventRsvp from '../../model/eventRSVP.js';
 import { fetchMe } from '../../model/spotifyModel.js';
@@ -90,9 +91,10 @@ router.get('/candidates', async (req, res, next) => {
     }
 
     // Get me's data for match-score breakdown
-    const meGenres = new Set(Array.isArray(me.genres) ? me.genres : []);
+    const mySpotifyData = await SpotifyData.findByPk(me.id);
+    const meGenres = new Set(Array.isArray(mySpotifyData?.genres) ? mySpotifyData.genres : []);
     const meArtistIds = new Set(
-      (Array.isArray(me.topArtists) ? me.topArtists : []).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean),
+      (Array.isArray(mySpotifyData?.topArtists) ? mySpotifyData.topArtists : []).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean),
     );
     // My event RSVPs
     const myRsvps = await EventRsvp.findAll({
@@ -101,17 +103,30 @@ router.get('/candidates', async (req, res, next) => {
     });
     const myEventIds = new Set(myRsvps.map((r) => r.eventId));
 
+    // Fetch SpotifyData for all candidates
+    const allSpotifyData = otherIds.length
+      ? await SpotifyData.findAll({ where: { userId: { [Op.in]: otherIds } } })
+      : [];
+    const spotifyDataByUser = {};
+    for (const sd of allSpotifyData) spotifyDataByUser[sd.userId] = sd;
+
     const result = others.map((u, index) => {
+<<<<<<< HEAD
       const displayName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.displayName;
       const artistNames = Array.isArray(u.topArtists)
         ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
+=======
+      const uSpotify = spotifyDataByUser[u.id];
+      const artistNames = Array.isArray(uSpotify?.topArtists)
+        ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
+>>>>>>> 53f80857782363d717655499852d583e9e28e7a5
         : [];
 
-      const artistIds = Array.isArray(u.topArtists)
-        ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
+      const artistIds = Array.isArray(uSpotify?.topArtists)
+        ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
         : [];
 
-      const uGenres = Array.isArray(u.genres) ? u.genres : [];
+      const uGenres = Array.isArray(uSpotify?.genres) ? uSpotify.genres : [];
 
       // Match score breakdown
       const uGenreSet = new Set(uGenres);
@@ -139,8 +154,8 @@ router.get('/candidates', async (req, res, next) => {
         bio: u.bio || 'Music lover',
         distance: 'Nearby',
         topArtists: artistNames,
-        topTracks: Array.isArray(u.topTracks)
-          ? u.topTracks
+        topTracks: Array.isArray(uSpotify?.topTracks)
+          ? uSpotify.topTracks
               .map((t) => ({
                 name: typeof t === 'string' ? t : t?.name,
                 artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',

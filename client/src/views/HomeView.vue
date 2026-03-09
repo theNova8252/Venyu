@@ -1,73 +1,46 @@
 <template>
   <q-page class="home">
     <!-- Background -->
-    <div class="bg-orbs">
+    <div class="bg-mesh">
       <div class="orb orb-1"></div>
       <div class="orb orb-2"></div>
       <div class="orb orb-3"></div>
-      <div class="noise"></div>
+      <div class="bg-noise"></div>
     </div>
 
-    <div class="container q-pa-md q-pa-lg-lg">
+    <div class="home-container">
 
       <!-- HERO -->
-      <section class="hero glass q-pa-lg q-pa-xl-lg">
+      <section class="hero-card liquid-glass">
         <div class="hero-grid">
 
           <!-- Left: Greeting + CTA -->
           <div class="hero-left">
-            <div class="hero-badge">
-              <span>Venyu</span>
-            </div>
-
             <template v-if="loadingMe">
               <q-skeleton type="text" width="70%" height="48px" />
               <q-skeleton type="text" width="45%" class="q-mt-sm" />
             </template>
 
             <template v-else>
-              <h1 class="hero-title">
-                Welcome back,
-                <span class="hero-name">{{ displayName }}</span>
-              </h1>
+              <p class="hero-greeting">Welcome back,</p>
+              <h1 class="hero-name">{{ displayName }}</h1>
               <p class="hero-subtitle">
-                Your music taste is your superpower. Let’s find your people.
+                Your music taste is your superpower. Let's find your people.
               </p>
             </template>
 
-            <div class="hero-actions q-mt-md q-mt-lg-lg">
+            <div class="hero-actions">
               <q-btn to="/swipe" unelevated no-caps class="cta-primary" icon="swipe" label="Start Swiping" />
               <q-btn to="/events" flat no-caps class="cta-secondary" icon="event" label="Explore Events" />
-            </div>
-
-            <!-- Quick stats row -->
-            <div class="hero-stats q-mt-lg">
-              <div class="stat-pill">
-                <div class="stat-value">{{ user.me?.topArtists?.length || 0 }}</div>
-                <div class="stat-label">Top Artists</div>
-              </div>
-              <div class="stat-pill">
-                <div class="stat-value">{{ matches.list?.length || 0 }}</div>
-                <div class="stat-label">Matches</div>
-              </div>
-              <div class="stat-pill">
-                <div class="stat-value">{{ events.list?.length || 0 }}</div>
-                <div class="stat-label">Events</div>
-              </div>
-              <div class="stat-pill">
-                <div class="stat-value">{{ user.me?.genres?.length || 0 }}</div>
-                <div class="stat-label">Genres</div>
-              </div>
             </div>
           </div>
 
           <!-- Right: Spotify profile -->
           <div class="hero-right">
-            <div class="profile glass-strong q-pa-md q-pa-lg-lg">
-              <div class="row items-center no-wrap q-gutter-md">
-
+            <div class="profile-card liquid-glass-strong">
+              <div class="profile-top">
                 <template v-if="loadingMe">
-                  <q-skeleton type="QAvatar" size="84px" />
+                  <q-skeleton type="QAvatar" size="72px" />
                   <div class="col">
                     <q-skeleton type="text" width="60%" />
                     <q-skeleton type="text" width="40%" />
@@ -75,65 +48,81 @@
                 </template>
 
                 <template v-else>
-                  <q-avatar size="84px" class="profile-avatar">
+                  <q-avatar size="72px" class="profile-avatar">
                     <img v-if="avatarUrl" :src="avatarUrl" />
                     <div v-else class="initials">{{ initials }}</div>
                   </q-avatar>
 
-                  <div class="col">
+                  <div class="profile-info">
                     <div class="profile-name">{{ displayName }}</div>
                     <div class="profile-handle" v-if="user.me?.spotifyId">
                       @{{ user.me.spotifyId }}
                     </div>
-                    <div class="profile-meta q-mt-xs">
-                      <q-icon name="public" size="14px" />
+                    <div class="profile-meta">
+                      <q-icon name="public" size="13px" />
                       <span>{{ user.me?.country || 'World' }}</span>
-                      <span class="dot">•</span>
+                      <span class="dot">·</span>
                       <span>{{ user.me?.product || 'Spotify User' }}</span>
                     </div>
                   </div>
                 </template>
               </div>
 
-              <q-separator dark class="q-my-md" />
+              <div class="profile-divider"></div>
 
-              <div class="row items-center justify-between">
-                <div class="mini">
-                  <div class="mini-label">Last sync</div>
-                  <div class="mini-value">
-                    {{ lastSync }}
-                  </div>
+              <div class="profile-bottom">
+                <div class="sync-info">
+                  <span class="sync-label">Last sync</span>
+                  <span class="sync-value">{{ lastSync }}</span>
                 </div>
-                <q-btn flat dense no-caps icon="sync" label="Refresh" @click="refreshAll" class="refresh-btn" />
+                <q-btn flat dense no-caps icon="sync" label="Refresh" size="sm" @click="refreshAll" class="refresh-btn" />
               </div>
             </div>
 
-            <!-- Small secondary CTA -->
-            <router-link to="/profile" class="profile-link q-mt-md">
+            <router-link to="/profile" class="profile-link">
               View full profile
-              <q-icon name="arrow_forward" size="18px" />
+              <q-icon name="arrow_forward" size="16px" />
             </router-link>
           </div>
+        </div>
 
+        <!-- Stats strip -->
+        <div class="stats-strip">
+          <div class="stat-pill liquid-glass-inset">
+            <div class="stat-value">{{ user.me?.topArtists?.length || 0 }}</div>
+            <div class="stat-label">Top Artists</div>
+          </div>
+          <div class="stat-pill liquid-glass-inset">
+            <div class="stat-value">{{ matches.list?.length || 0 }}</div>
+            <div class="stat-label">Matches</div>
+          </div>
+          <div class="stat-pill liquid-glass-inset">
+            <div class="stat-value">{{ events.list?.length || 0 }}</div>
+            <div class="stat-label">Events</div>
+          </div>
+          <div class="stat-pill liquid-glass-inset">
+            <div class="stat-value">{{ user.me?.genres?.length || 0 }}</div>
+            <div class="stat-label">Genres</div>
+          </div>
         </div>
       </section>
 
       <!-- CURRENTLY PLAYING -->
-      <section v-if="currentlyPlaying?.isPlaying" class="now-playing-banner glass q-pa-md q-mt-lg">
-        <div class="np-banner-inner">
-          <img v-if="currentlyPlaying.albumImage" :src="currentlyPlaying.albumImage" class="np-banner-cover" />
-          <div class="np-banner-info">
-            <div class="np-banner-label">
-              <div class="np-live-dot"></div>
+      <section v-if="currentlyPlaying?.isPlaying" class="np-card liquid-glass">
+        <div class="np-inner">
+          <img v-if="currentlyPlaying.albumImage" :src="currentlyPlaying.albumImage" class="np-cover" />
+          <div class="np-info">
+            <div class="np-label">
+              <div class="np-dot"></div>
               Now Playing on Spotify
             </div>
-            <div class="np-banner-track">{{ currentlyPlaying.trackName }}</div>
-            <div class="np-banner-artist">{{ currentlyPlaying.artistName }}</div>
+            <div class="np-track">{{ currentlyPlaying.trackName }}</div>
+            <div class="np-artist">{{ currentlyPlaying.artistName }}</div>
             <div class="np-progress">
-              <div class="np-progress-bar">
-                <div class="np-progress-fill" :style="{ width: npProgress + '%' }"></div>
+              <div class="np-bar">
+                <div class="np-fill" :style="{ width: npProgress + '%' }"></div>
               </div>
-              <div class="np-progress-time">
+              <div class="np-times">
                 <span>{{ formatMs(interpolatedProgress) }}</span>
                 <span>{{ formatMs(currentlyPlaying.durationMs) }}</span>
               </div>
@@ -143,16 +132,14 @@
       </section>
 
       <!-- MAIN GRID -->
-      <section class="main-grid q-mt-xl">
-        <!-- Left -->
+      <section class="main-grid">
+        <!-- Left column -->
         <div class="col-left">
           <!-- Recently Played -->
-          <div class="glass q-pa-lg content-card">
+          <div class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="history" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="history" size="18px" /></div>
                 <h3>Recently Played</h3>
               </div>
               <q-btn flat round dense icon="refresh" size="sm" @click="fetchRecentlyPlayed" />
@@ -162,35 +149,32 @@
               <q-skeleton v-for="i in 5" :key="i" height="44px" />
             </div>
 
-            <div v-else class="list">
-              <div v-for="(item, idx) in recentlyPlayed.slice(0, 5)" :key="idx" class="list-row track-row">
+            <div v-else class="track-list">
+              <div v-for="(item, idx) in recentlyPlayed.slice(0, 5)" :key="idx" class="track-row">
                 <q-avatar size="36px" class="track-cover">
                   <img v-if="item.track.album.image" :src="item.track.album.image" />
                   <div v-else class="initials small">{{ (item.track.name || '?')[0] }}</div>
                 </q-avatar>
-
                 <div class="col min-width-0">
                   <div class="track-name text-ellipsis">{{ item.track.name }}</div>
-                  <div class="muted text-ellipsis" style="font-size:0.75rem">
-                    {{item.track.artists.map(a => a.name).join(', ')}}
+                  <div class="track-artist text-ellipsis">
+                    {{ item.track.artists.map(a => a.name).join(', ') }}
                   </div>
                 </div>
-
-                <div class="track-time muted">{{ formatPlayedAt(item.playedAt) }}</div>
+                <div class="track-time">{{ formatPlayedAt(item.playedAt) }}</div>
               </div>
 
-              <div v-if="!recentlyPlayed.length" class="empty">
+              <div v-if="!recentlyPlayed.length" class="empty-state">
                 No recent plays found. Start listening on Spotify!
               </div>
             </div>
           </div>
+
           <!-- Top Artists -->
-          <div class="glass q-pa-lg content-card">
+          <div class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="stars" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="stars" size="18px" /></div>
                 <h3>Your Top Artists</h3>
               </div>
             </div>
@@ -212,41 +196,33 @@
                 <div class="artist-cell-name">{{ artist.name }}</div>
               </div>
 
-              <div v-if="!user.me?.topArtists?.length" class="empty" style="grid-column: 1 / -1">
+              <div v-if="!user.me?.topArtists?.length" class="empty-state" style="grid-column: 1 / -1">
                 No top artists yet — sync Spotify to see your vibe.
               </div>
             </div>
           </div>
 
-
           <!-- Genres -->
-          <div v-if="user.me?.genres?.length" class="glass q-pa-lg content-card">
+          <div v-if="user.me?.genres?.length" class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="library_music" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="library_music" size="18px" /></div>
                 <h3>Favorite Genres</h3>
               </div>
             </div>
-
             <div class="chip-wrap">
-              <q-chip v-for="g in user.me.genres" :key="g" color="pink-6" text-color="white" outline class="genre-chip">
-                {{ g }}
-              </q-chip>
+              <span v-for="g in user.me.genres" :key="g" class="genre-chip">{{ g }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Right -->
+        <!-- Right column -->
         <div class="col-right">
-          <!-- Matches -->
-          <div class="glass q-pa-lg content-card">
+          <!-- My Events -->
+          <div class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="event_available" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="event_available" size="18px" /></div>
                 <h3>My Events</h3>
               </div>
             </div>
@@ -254,110 +230,97 @@
               <q-skeleton v-for="i in 3" :key="i" height="64px" />
             </div>
             <div v-else>
-              <!-- Interested -->
               <div v-if="interestedEvents.length" class="event-section">
                 <div class="section-label">
-                  <q-icon name="star" size="16px" color="pink-6" />
+                  <q-icon name="star" size="14px" color="pink-6" />
                   <span>Interested ({{ interestedEvents.length }})</span>
                 </div>
-                <div class="list">
-                  <div v-for="e in interestedEvents" :key="e.id" class="event-row small">
-                    <div class="event-date">
+                <div class="event-list">
+                  <div v-for="e in interestedEvents" :key="e.id" class="event-row">
+                    <div class="event-date-badge">
                       <div class="month">{{ formatEventMonth(e.date) }}</div>
                       <div class="day">{{ formatEventDay(e.date) }}</div>
                     </div>
                     <div class="col">
                       <div class="event-title">{{ e.title }}</div>
-                      <div class="muted">
-                        <q-icon name="place" size="14px" />
-                        {{ e.city }}
-                      </div>
+                      <div class="event-meta"><q-icon name="place" size="13px" /> {{ e.city }}</div>
                     </div>
                     <q-btn flat round icon="close" size="sm" @click="events.toggleInterested(e.id)" />
                   </div>
                 </div>
               </div>
-              <div v-if="goingEvents.length" class="event-section q-mt-md">
+
+              <div v-if="goingEvents.length" class="event-section" style="margin-top: 12px">
                 <div class="section-label">
-                  <q-icon name="check_circle" size="16px" color="purple-6" />
+                  <q-icon name="check_circle" size="14px" color="purple-6" />
                   <span>Going ({{ goingEvents.length }})</span>
                 </div>
-                <div class="list">
-                  <div v-for="e in goingEvents" :key="e.id" class="event-row small">
-                    <div class="event-date">
+                <div class="event-list">
+                  <div v-for="e in goingEvents" :key="e.id" class="event-row">
+                    <div class="event-date-badge">
                       <div class="month">{{ formatEventMonth(e.date) }}</div>
                       <div class="day">{{ formatEventDay(e.date) }}</div>
                     </div>
                     <div class="col">
                       <div class="event-title">{{ e.title }}</div>
-                      <div class="muted">
-                        <q-icon name="place" size="14px" />
-                        {{ e.city }}
-                      </div>
+                      <div class="event-meta"><q-icon name="place" size="13px" /> {{ e.city }}</div>
                     </div>
                     <q-btn flat round icon="close" size="sm" @click="events.toggleGoing(e.id)" />
                   </div>
                 </div>
               </div>
 
-              <div v-if="!interestedEvents.length && !goingEvents.length" class="empty">
+              <div v-if="!interestedEvents.length && !goingEvents.length" class="empty-state">
                 Mark events as interested or going on the map!
               </div>
             </div>
           </div>
-          <div class="glass q-pa-lg content-card">
+
+          <!-- My Matches -->
+          <div class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="people" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="people" size="18px" /></div>
                 <h3>My Matches</h3>
               </div>
-            </div>^
+            </div>
 
             <div v-if="loadingMatches" class="q-gutter-sm">
               <q-skeleton v-for="i in 3" :key="i" height="64px" />
             </div>
 
-            <div v-else class="list">
+            <div v-else class="match-list">
               <div v-for="m in matches.list" :key="m.id" class="match-row">
-                <q-avatar size="48px">
+                <q-avatar size="44px" class="match-avatar">
                   <img v-if="m.avatarUrl" :src="m.avatarUrl" />
-                  <div v-else class="initials small">
-                    {{ (m.name || 'M')[0] }}
-                  </div>
+                  <div v-else class="initials small">{{ (m.name || 'M')[0] }}</div>
                 </q-avatar>
-
                 <div class="col">
                   <div class="match-top">
                     <div class="match-name">{{ m.name || 'Match' }}</div>
-                    <div class="match-score">{{ m.score ?? m.matchScore ?? m.compability ?? 0 }}% match</div>
+                    <div class="match-score">{{ m.score ?? m.matchScore ?? m.compability ?? 0 }}%</div>
                   </div>
-                  <div class="muted ellipsis">
+                  <div class="match-detail ellipsis">
                     {{ m.sharedArtists?.join(', ') || 'No shared artists yet' }}
                   </div>
                 </div>
-
                 <q-btn :flat="!m.liked" :unelevated="m.liked" round :icon="m.liked ? 'favorite' : 'favorite_border'"
                   :color="m.liked ? 'pink-6' : 'grey-6'" size="sm" :disable="m.liked" @click="matches.like(m.id)" />
               </div>
 
-              <div v-if="!matches.list?.length" class="empty">
+              <div v-if="!matches.list?.length" class="empty-state">
                 No matches yet — go swipe a bit!
               </div>
             </div>
           </div>
 
-          <!-- Events -->
-          <div class="glass q-pa-lg content-card">
+          <!-- Nearby Events -->
+          <div class="liquid-glass content-card">
             <div class="card-head">
               <div class="head-left">
-                <div class="head-icon">
-                  <q-icon name="confirmation_number" size="20px" />
-                </div>
+                <div class="head-icon"><q-icon name="confirmation_number" size="18px" /></div>
                 <h3>Nearby Events</h3>
               </div>
-
               <q-btn flat round dense icon="refresh" size="sm" @click="events.fetchNearby()" />
             </div>
 
@@ -365,25 +328,20 @@
               <q-skeleton v-for="i in 4" :key="i" height="64px" />
             </div>
 
-            <div v-else class="list">
+            <div v-else class="event-list">
               <div v-for="e in events.list" :key="e.id" class="event-row">
-                <div class="event-date">
+                <div class="event-date-badge">
                   <div class="month">{{ formatEventMonth(e.date) }}</div>
                   <div class="day">{{ formatEventDay(e.date) }}</div>
                 </div>
-
                 <div class="col">
                   <div class="event-title">{{ e.title }}</div>
-                  <div class="muted">
-                    <q-icon name="place" size="14px" />
-                    {{ e.city }}
-                  </div>
+                  <div class="event-meta"><q-icon name="place" size="13px" /> {{ e.city }}</div>
                 </div>
-
                 <q-btn flat round icon="arrow_forward" size="sm" />
               </div>
 
-              <div v-if="!events.list?.length" class="empty">
+              <div v-if="!events.list?.length" class="empty-state">
                 No events nearby right now.
               </div>
             </div>
@@ -468,7 +426,6 @@ const displayName = computed(() => {
 });
 
 const avatarUrl = computed(() => {
-  // support multiple possible shapes
   return (
     user.me?.avatarUrl ||
     user.me?.imageUrl ||
@@ -509,10 +466,7 @@ const formatEventMonth = (dateString) =>
   new Date(dateString).toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 const formatEventDay = (dateString) =>
   new Date(dateString).getDate();
-const formatNumber = (n) => {
-  if (!n && n !== 0) return "—";
-  return Intl.NumberFormat("en-US", { notation: "compact" }).format(n);
-};
+
 const recentlyPlayed = computed(() => user.me?.recentlyPlayed || []);
 
 const interestedEvents = computed(() => {
@@ -525,16 +479,8 @@ const goingEvents = computed(() => {
 
 const fetchRecentlyPlayed = async () => {
   loadingRecent.value = true;
-  await user.fetchMe(); // Refresh user data which includes recently played
+  await user.fetchMe();
   loadingRecent.value = false;
-};
-
-const playTrack = async (trackUri) => {
-  try {
-    await axios.post('/api/spotify/player/play', { trackUri });
-  } catch (error) {
-    console.error('Error playing track:', error);
-  }
 };
 
 const formatPlayedAt = (dateString) => {
@@ -550,6 +496,7 @@ const formatPlayedAt = (dateString) => {
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d ago`;
 };
+
 onMounted(async () => {
   if (!user.me) await user.fetchMe();
   if (!matches.list.length) await matches.fetchMatches();
@@ -559,10 +506,8 @@ onMounted(async () => {
   loadingMatches.value = false;
   loadingEvents.value = false;
 
-  // Poll currently playing every 5s
   await fetchCurrentlyPlaying();
   npInterval = setInterval(fetchCurrentlyPlaying, 5000);
-  // Tick progress every 1s for smooth bar
   npTickInterval = setInterval(tickProgress, 1000);
 
   document.addEventListener('visibilitychange', onVisChange);
@@ -580,16 +525,17 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
+/* ─── Foundations ─────────────────────────────────────── */
 .home {
   min-height: 100vh;
-  background: #07070b;
-  color: #fff;
+  background: #0a0a0f;
+  color: #e4e4e7;
   position: relative;
   overflow-x: hidden;
 }
 
-/* Background orbs */
-.bg-orbs {
+/* ─── Background mesh ────────────────────────────────── */
+.bg-mesh {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -599,153 +545,167 @@ onUnmounted(() => {
 .orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(100px);
-  opacity: .3;
+  filter: blur(120px);
+  opacity: 0.25;
 }
 
 .orb-1 {
-  width: 520px;
-  height: 520px;
-  right: -140px;
-  top: -140px;
-  background: linear-gradient(135deg, #7c5cff, #a855f7);
+  width: 500px;
+  height: 500px;
+  right: -100px;
+  top: -120px;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
 }
 
 .orb-2 {
-  width: 420px;
-  height: 420px;
-  left: -120px;
-  bottom: -120px;
+  width: 400px;
+  height: 400px;
+  left: -80px;
+  bottom: -100px;
   background: linear-gradient(135deg, #ec4899, #ef4444);
 }
 
 .orb-3 {
-  width: 360px;
-  height: 360px;
-  left: 40%;
-  top: 35%;
-  background: linear-gradient(135deg, #22d3ee, #3b82f6);
+  width: 300px;
+  height: 300px;
+  left: 45%;
+  top: 40%;
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
 }
 
-.noise {
+.bg-noise {
   position: absolute;
   inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
 }
 
-/* Layout container */
-.container {
+/* ─── Container ──────────────────────────────────────── */
+.home-container {
   position: relative;
   z-index: 1;
-  max-width: 1300px;
+  max-width: 1280px;
   margin: 0 auto;
+  padding: 20px 20px 40px;
 }
 
-/* Glass */
-.glass {
-  background: rgba(255, 255, 255, 0.07);
+/* ─── Liquid Glass system ────────────────────────────── */
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border-radius: 24px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.liquid-glass-strong {
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  backdrop-filter: blur(8px);
-  border-radius: 22px;
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
 }
 
-.glass-strong {
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(10px);
-  border-radius: 18px;
+.liquid-glass-inset {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* Hero */
-.hero {
-  margin-top: 6px;
+/* ─── Hero ───────────────────────────────────────────── */
+.hero-card {
+  padding: 32px;
+  margin-top: 4px;
 }
 
 .hero-grid {
   display: grid;
-  grid-template-columns: 1.3fr .9fr;
+  grid-template-columns: 1.3fr 0.9fr;
   gap: 2rem;
+  align-items: start;
 }
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .5rem;
-  padding: .35rem .7rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  font-weight: 700;
-  letter-spacing: .4px;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.hero-title {
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  font-weight: 900;
-  margin: .8rem 0 .4rem;
-  line-height: 1.1;
+.hero-greeting {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.02em;
 }
 
 .hero-name {
-  color: #fff;
+  margin: 4px 0 10px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.75) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hero-subtitle {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 1.05rem;
-  max-width: 560px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 480px;
 }
 
 .hero-actions {
   display: flex;
-  gap: .7rem;
+  gap: 10px;
   flex-wrap: wrap;
+  margin-top: 24px;
 }
 
 .cta-primary {
-  background: rgba(255, 255, 255, 0.92);
-  color: #0f172a;
-  padding: .9rem 1.2rem;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7 50%, #ec4899) !important;
+  color: #fff !important;
+  padding: 10px 22px;
   border-radius: 14px;
   font-weight: 700;
+  font-size: 0.88rem;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
 }
 
 .cta-secondary {
-  color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 14px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
 }
 
-/* Hero stats */
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: .8rem;
+/* ─── Profile card ───────────────────────────────────── */
+.profile-card {
+  padding: 20px;
 }
 
-.stat-pill {
-  padding: .9rem 1rem;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.profile-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-.stat-value {
-  font-size: 1.6rem;
-  font-weight: 900;
-}
-
-.stat-label {
-  font-size: .75rem;
-  text-transform: uppercase;
-  letter-spacing: .8px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-/* Profile right */
 .profile-avatar {
-  border: 3px solid rgba(255, 255, 255, 0.18);
+  border: 2px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.12);
 }
 
 .initials {
@@ -755,324 +715,323 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 1.2rem;
-  background: rgba(255, 255, 255, 0.07);
+  font-size: 1.1rem;
+  background: rgba(139, 92, 246, 0.15);
 }
 
 .initials.small {
-  font-size: .95rem;
+  font-size: 0.85rem;
+}
+
+.profile-info {
+  min-width: 0;
 }
 
 .profile-name {
-  font-weight: 900;
-  font-size: 1.3rem;
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: #fff;
 }
 
 .profile-handle {
-  font-size: .9rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.45);
 }
 
 .profile-meta {
   display: flex;
   align-items: center;
-  gap: .4rem;
-  font-size: .85rem;
-  color: rgba(255, 255, 255, 0.6);
+  gap: 5px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
 }
 
 .dot {
-  margin: 0 .25rem;
+  opacity: 0.4;
+}
+
+.profile-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  margin: 14px 0;
+}
+
+.profile-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sync-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.sync-value {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.refresh-btn {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .profile-link {
   display: inline-flex;
-  gap: .35rem;
+  gap: 6px;
   align-items: center;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
-  font-weight: 700;
-  padding: .6rem .8rem;
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  margin-top: 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   width: fit-content;
 }
 
 .profile-link:hover {
-  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* Main grid */
+/* ─── Stats strip ────────────────────────────────────── */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.stat-pill {
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+/* ─── Now Playing ────────────────────────────────────── */
+.np-card {
+  padding: 16px 20px;
+  margin-top: 16px;
+  border-color: rgba(30, 215, 96, 0.15) !important;
+  background: rgba(30, 215, 96, 0.04) !important;
+}
+
+.np-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.np-cover {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.np-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.np-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1ed760;
+  margin-bottom: 4px;
+}
+
+.np-dot {
+  width: 6px;
+  height: 6px;
+  background: #1ed760;
+  border-radius: 50%;
+}
+
+.np-track {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-artist {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-progress {
+  margin-top: 8px;
+}
+
+.np-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.np-fill {
+  height: 100%;
+  background: #1ed760;
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.np-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.3);
+  margin-top: 3px;
+}
+
+/* ─── Main grid ──────────────────────────────────────── */
 .main-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.2rem;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .content-card {
-  margin-bottom: 1.2rem;
+  padding: 24px;
+  margin-bottom: 16px;
 }
 
-/* Card header */
+/* ─── Card header ────────────────────────────────────── */
 .card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
+  margin-bottom: 16px;
 }
 
 .head-left {
   display: flex;
   align-items: center;
-  gap: .8rem;
+  gap: 10px;
 }
 
 .head-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(139, 92, 246, 0.12);
+  color: rgba(167, 139, 250, 0.9);
 }
 
 .card-head h3 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: -0.01em;
+}
+
+/* ─── Track list ─────────────────────────────────────── */
+.track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .track-row {
-  cursor: pointer;
-  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .track-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .track-cover {
   border-radius: 8px;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .track-name {
   font-weight: 600;
-  font-size: 0.85rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.track-artist {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .track-time {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.3);
   white-space: nowrap;
-  opacity: 0.6;
-}
-
-/* Lists */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: .6rem;
-}
-
-.list-row {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .45rem .75rem;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.rank {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.list-text {
-  font-weight: 700;
-}
-
-.verified {
-  color: #c084fc;
-}
-
-.event-section {
-  margin-bottom: 1rem;
-}
-
-.section-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 0.5rem;
-}
-
-.event-row.small {
-  padding: 0.6rem 0.8rem;
-}
-
-.event-row.small .event-date {
-  width: 48px;
-  height: 48px;
-}
-
-.event-row.small .event-title {
-  font-size: 0.9rem;
-}
-
-.match-row,
-.event-row {
-  display: flex;
-  align-items: center;
-  gap: .9rem;
-  padding: .8rem 1rem;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.match-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.match-name {
-  font-weight: 800;
-}
-
-.match-score {
-  font-size: .8rem;
-  font-weight: 900;
-  color: #fff;
-  padding: .2rem .5rem;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #ec4899, #a855f7);
-}
-
-.muted {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: .9rem;
-  display: flex;
-  align-items: center;
-  gap: .3rem;
-}
-
-.event-date {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #22d3ee, #3b82f6);
   flex-shrink: 0;
 }
 
-.month {
-  font-size: .7rem;
-  font-weight: 900;
-  opacity: .9;
-}
-
-.day {
-  font-size: 1.4rem;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.chip-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-}
-
-.genre-chip {
-  border-radius: 10px;
-  font-weight: 700;
-}
-
-.empty {
-  padding: 1rem;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 12px;
-}
-
-/* Responsive */
-@media (max-width: 1024px) {
-  .hero-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .main-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 520px) {
-  .hero-stats {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.artist-followers {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: .35rem;
-  font-size: .85rem;
-  color: rgba(255, 255, 255, 0.65);
-}
-
+/* ─── Artist grid ────────────────────────────────────── */
 .artist-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: .75rem;
+  gap: 10px;
 }
 
 .artist-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: .5rem;
+  gap: 6px;
   text-align: center;
-  padding: .5rem;
+  padding: 8px;
   border-radius: 14px;
-  transition: background .2s ease, transform .15s ease;
-  cursor: default;
 }
 
 .artist-cell:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .artist-img {
@@ -1080,7 +1039,7 @@ onUnmounted(() => {
   aspect-ratio: 1;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .artist-img img {
@@ -1097,9 +1056,9 @@ onUnmounted(() => {
 }
 
 .artist-cell-name {
-  font-size: .78rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.75);
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1107,93 +1066,186 @@ onUnmounted(() => {
   max-width: 100%;
 }
 
-/* ── Now Playing Banner ── */
-.now-playing-banner {
-  border: 1px solid rgba(30, 215, 96, 0.2);
-  border-radius: 16px;
-  background: rgba(30, 215, 96, 0.06) !important;
-}
-
-.np-banner-inner {
+/* ─── Genre chips ────────────────────────────────────── */
+.chip-wrap {
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.np-banner-cover {
-  width: 72px;
-  height: 72px;
+.genre-chip {
+  display: inline-block;
+  padding: 6px 14px;
   border-radius: 10px;
-  object-fit: cover;
-  flex-shrink: 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.18);
 }
 
-.np-banner-info {
-  flex: 1;
-  min-width: 0;
+/* ─── Event list ─────────────────────────────────────── */
+.event-section {
+  margin-bottom: 8px;
 }
 
-.np-banner-label {
+.section-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #1ed760;
-  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 8px;
 }
 
-.np-live-dot {
-  width: 6px;
-  height: 6px;
-  background: #1ed760;
-  border-radius: 50%;
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.np-banner-track {
-  font-size: 1rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.event-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.event-date-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(59, 130, 246, 0.25));
+  border: 1px solid rgba(6, 182, 212, 0.15);
+  flex-shrink: 0;
+}
+
+.month {
+  font-size: 0.6rem;
+  font-weight: 800;
+  opacity: 0.8;
+  letter-spacing: 0.04em;
+}
+
+.day {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1;
   color: #fff;
 }
 
-.np-banner-artist {
-  font-size: 0.82rem;
-  color: rgba(255, 255, 255, 0.55);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.event-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.np-progress {
-  margin-top: 8px;
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
 }
 
-.np-progress-bar {
-  width: 100%;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
+/* ─── Match list ─────────────────────────────────────── */
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.np-progress-fill {
-  height: 100%;
-  background: #1ed760;
-  border-radius: 2px;
-  transition: width 1s linear;
+.match-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.np-progress-time {
+.match-avatar {
+  flex-shrink: 0;
+}
+
+.match-top {
   display: flex;
   justify-content: space-between;
-  font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.35);
-  margin-top: 2px;
+  align-items: center;
+}
+
+.match-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #fff;
+}
+
+.match-score {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ec4899, #a855f7);
+}
+
+.match-detail {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ─── Empty state ────────────────────────────────────── */
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Responsive ─────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .home-container {
+    padding: 12px 12px 32px;
+  }
+
+  .hero-card {
+    padding: 20px;
+  }
+
+  .stats-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .content-card {
+    padding: 18px;
+  }
 }
 </style>

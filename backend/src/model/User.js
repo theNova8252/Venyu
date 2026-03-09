@@ -2,15 +2,16 @@ import { DataTypes, Model } from 'sequelize';
 import { sequelize } from './db.js';
 
 class User extends Model {
-  // Add a method to get safe user data for frontend
   toJSON() {
     const values = { ...this.get() };
-
-    // Convert snake_case to camelCase for frontend
+    // Never expose tokens or internal associations raw
+    delete values.SpotifyToken;
+    delete values.SpotifyData;
     return {
       id: values.id,
       spotifyId: values.spotifyId,
       displayName: values.displayName,
+<<<<<<< HEAD
       display_name: values.displayName, // Keep both for compatibility
       firstName: values.firstName,
       first_name: values.firstName, // Keep both for compatibility
@@ -18,21 +19,15 @@ class User extends Model {
       last_name: values.lastName, // Keep both for compatibility
       birthDate: values.birthDate,
       birth_date: values.birthDate, // Keep both for compatibility
+=======
+>>>>>>> 53f80857782363d717655499852d583e9e28e7a5
       email: values.email,
       avatarUrl: values.avatarUrl,
-      avatar_url: values.avatarUrl, // Keep both for compatibility
       country: values.country,
       product: values.product,
       bio: values.bio,
       age: values.age,
       isVisible: values.isVisible,
-      is_visible: values.isVisible, // Keep both for compatibility
-      topArtists: values.topArtists,
-      top_artists: values.topArtists, // Keep both for compatibility
-      topTracks: values.topTracks,
-      top_tracks: values.topTracks, // Keep both for compatibility
-      recentlyPlayed: values.recentlyPlayed,
-      genres: values.genres,
       createdAt: values.createdAt,
       updatedAt: values.updatedAt,
     };
@@ -41,6 +36,7 @@ class User extends Model {
 
 User.init(
   {
+<<<<<<< HEAD
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     spotifyId: { type: DataTypes.STRING, allowNull: false, unique: true, field: 'spotify_id' },
     displayName: { type: DataTypes.STRING, field: 'display_name' },
@@ -61,11 +57,53 @@ User.init(
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
     recentlyPlayed: { type: DataTypes.JSONB, field: 'recently_played' },
     genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
+=======
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    spotifyId: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      field: 'spotify_id',
+    },
+    displayName: {
+      type: DataTypes.STRING,
+      field: 'display_name',
+    },
+    email: {
+      type: DataTypes.STRING,
+    },
+    avatarUrl: {
+      type: DataTypes.TEXT,
+      field: 'avatar_url',
+    },
+    country: {
+      type: DataTypes.STRING(2),
+    },
+    product: {
+      type: DataTypes.STRING,
+    },
+    bio: {
+      type: DataTypes.TEXT,
+    },
+    age: {
+      type: DataTypes.INTEGER,
+    },
+    isVisible: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      field: 'is_visible',
+    },
+>>>>>>> 53f80857782363d717655499852d583e9e28e7a5
   },
   {
     sequelize,
     modelName: 'User',
     tableName: 'users',
+    timestamps: true,
   },
 );
 

@@ -66,9 +66,25 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async fetchMe() {
       try {
-        const res = await fetch('/api/user/me', {
+        let res = await fetch('/api/user/me', {
           credentials: 'include',
         });
+
+        // If unauthorized, try refreshing the token and retry once
+        if (res.status === 401) {
+          const refreshRes = await fetch('/api/spotify/auth/refresh', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+
+          if (refreshRes.ok) {
+            res = await fetch('/api/user/me', {
+              credentials: 'include',
+            });
+          }
+        }
 
         if (!res.ok) {
           this.user = null;

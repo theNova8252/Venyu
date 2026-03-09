@@ -27,10 +27,9 @@ Like.init(
     tableName: 'likes',
     timestamps: true,
     indexes: [
-      {
-        unique: true,
-        fields: ['from_user_id', 'to_user_id'],
-      },
+      { unique: true, fields: ['from_user_id', 'to_user_id'] },
+      { fields: ['from_user_id'] },
+      { fields: ['to_user_id'] },
     ],
   },
 );

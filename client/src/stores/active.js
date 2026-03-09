@@ -73,6 +73,7 @@ export const usePresenceStore = defineStore("presence", {
     offlineSinceByUserId: loadMap(), // { [userId]: ISOString }
     socket: null,
     connected: false,
+    pendingMatch: null, // { roomId, user: { id, name, avatar } }
   }),
 
   getters: {
@@ -129,6 +130,15 @@ export const usePresenceStore = defineStore("presence", {
             return;
           }
 
+          // Match event from backend
+          if (data.type === "match") {
+            this.pendingMatch = {
+              roomId: data.roomId,
+              user: data.user,
+            };
+            return;
+          }
+
           if (data.type === "presence") {
             const id = String(data.userId);
 
@@ -166,6 +176,10 @@ export const usePresenceStore = defineStore("presence", {
       socket.onerror = (err) => {
         console.error("Presence WS error", err);
       };
+    },
+
+    clearMatch() {
+      this.pendingMatch = null;
     },
   },
 });

@@ -2,6 +2,7 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import User from '../model/User.js';
+import SpotifyData from '../model/SpotifyData.js';
 import { fetchMe } from '../model/spotifyModel.js';
 
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -26,6 +27,8 @@ export const getMeProfile = async (req, res, next) => {
     const user = await User.findOne({ where: { spotifyId: sp.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
+    const spotifyData = await SpotifyData.findByPk(user.id);
+
     return res.json({
       id: user.id,
       spotifyId: user.spotifyId,
@@ -41,10 +44,10 @@ export const getMeProfile = async (req, res, next) => {
       age: user.age,
       isVisible: user.isVisible,
 
-      genres: user.genres,
-      topArtists: user.topArtists,
-      topTracks: user.topTracks,
-      recentlyPlayed: user.recentlyPlayed,
+      genres: spotifyData?.genres ?? [],
+      topArtists: spotifyData?.topArtists ?? [],
+      topTracks: spotifyData?.topTracks ?? [],
+      recentlyPlayed: spotifyData?.recentlyPlayed ?? [],
 
       spotify: {
         id: sp.id,
