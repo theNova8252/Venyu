@@ -16,16 +16,16 @@ ChatMessage.init(
       field: 'room_id',
     },
     senderId: {
-      type: DataTypes.STRING,
+      type: DataTypes.UUID,
       allowNull: false,
       field: 'sender_id',
     },
     ciphertext: {
-      type: DataTypes.TEXT, // base64
+      type: DataTypes.TEXT,
       allowNull: false,
     },
     iv: {
-      type: DataTypes.STRING, // base64
+      type: DataTypes.STRING,
       allowNull: false,
     },
     version: {
@@ -33,15 +33,13 @@ ChatMessage.init(
       allowNull: false,
       defaultValue: 'aes-gcm-v1',
     },
-
-    // ✅ Read Receipt Speicherung (1:1 Chat)
     readAt: {
       type: DataTypes.DATE,
       allowNull: true,
       field: 'read_at',
     },
     readBy: {
-      type: DataTypes.STRING,
+      type: DataTypes.UUID,
       allowNull: true,
       field: 'read_by',
     },

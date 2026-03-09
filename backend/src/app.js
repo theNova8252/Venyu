@@ -14,6 +14,7 @@ import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import eventRoutes from './api/routes/eventRoutes.js';
 import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
+import { autoRefreshToken } from './middleware/autoRefresh.js';
 
 import http from 'http';
 import { WebSocketServer } from 'ws';
@@ -21,6 +22,8 @@ import cookie from 'cookie';
 
 // Modelle
 import User from './model/User.js';
+import SpotifyToken from './model/SpotifyToken.js';
+import SpotifyData from './model/SpotifyData.js';
 import ChatMessage from './model/ChatMessage.js';
 import Like from './model/Like.js';
 import { fetchMe } from './model/spotifyModel.js';
@@ -101,6 +104,9 @@ function getArtistId(artist) {
   return null;
 }
 
+// ---------- Auto-refresh expired tokens ----------
+app.use('/api', autoRefreshToken);
+
 // ---------- API-Routen ----------
 app.use('/api/spotify', spotifyRoutes);
 app.use('/api/user', userRoutes);
@@ -113,11 +119,12 @@ app.get('/api/matches/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
 
-    // My data for matching
-    const myTopArtists = toArray(me.topArtists);
+    // My music data from spotify_data table
+    const mySpotifyData = await SpotifyData.findByPk(me.id);
+    const myTopArtists = toArray(mySpotifyData?.topArtists);
     const myArtistIds = new Set(myTopArtists.map(getArtistId).filter(Boolean));
     const myArtistNames = new Set(myTopArtists.map(getArtistName).filter(Boolean).map(n => n.toLowerCase()));
-    const myGenres = new Set(toArray(me.genres).map((genre) => String(genre).toLowerCase()));
+    const myGenres = new Set(toArray(mySpotifyData?.genres).map((genre) => String(genre).toLowerCase()));
 
     // Filter out already liked users
     const myLikes = await Like.findAll({
@@ -160,9 +167,17 @@ app.get('/api/matches/candidates', async (req, res, next) => {
       rsvpsByUser[r.userId].push({ eventId: r.eventId, interested: r.interested, going: r.going });
     }
 
+    // Fetch SpotifyData for all candidates
+    const allSpotifyData = otherIds.length
+      ? await SpotifyData.findAll({ where: { userId: { [Op.in]: otherIds } } })
+      : [];
+    const spotifyDataByUser = {};
+    for (const sd of allSpotifyData) spotifyDataByUser[sd.userId] = sd;
+
     const result = others.map((u, index) => {
-      const candidateTopArtists = toArray(u.topArtists);
-      const candidateGenres = toArray(u.genres).map((genre) => String(genre));
+      const uSpotify = spotifyDataByUser[u.id];
+      const candidateTopArtists = toArray(uSpotify?.topArtists);
+      const candidateGenres = toArray(uSpotify?.genres).map((genre) => String(genre));
       const topArtists = candidateTopArtists.map(getArtistName).filter(Boolean);
 
       // --- Genre matching (Jaccard similarity) ---
@@ -199,7 +214,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
         bio: u.bio || 'Music lover 🎵',
         distance: 'Nearby',
         topArtists,
-        topTracks: toArray(u.topTracks)
+        topTracks: toArray(uSpotify?.topTracks)
           .map((t) => ({
             name: typeof t === 'string' ? t : t?.name,
             artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',
@@ -253,6 +268,29 @@ app.post('/api/matches/:otherUserId/like', async (req, res, next) => {
 
     if (reciprocal) {
       const roomId = makeRoomId(me.id, otherUserId);
+
+      // Notify the OTHER user about the match via presence WS
+      sendToUser(otherUserId, {
+        type: 'match',
+        roomId,
+        user: {
+          id: me.id,
+          name: me.displayName || 'Someone',
+          avatar: me.avatarUrl || null,
+        },
+      });
+
+      // Also notify the current user (in case they have other tabs)
+      sendToUser(me.id, {
+        type: 'match',
+        roomId,
+        user: {
+          id: other.id,
+          name: other.displayName || 'Someone',
+          avatar: other.avatarUrl || null,
+        },
+      });
+
       return res.json({ isMatch: true, roomId });
     }
 
@@ -306,6 +344,7 @@ const PORT = Number(process.env.PORT) || 5000;
 const rooms = new Map(); // roomId -> Set<WebSocket>
 const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
 const lastSeenAt = new Map(); // userId -> ISO timestamp (letztes offline)
+let wssRef = null; // stored when server boots so HTTP routes can broadcast
 
 function addClientToRoom(roomId, ws) {
   let set = rooms.get(roomId);
@@ -359,6 +398,18 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
   }
 }
 
+// Send a message to a specific user via any open presence WS connection
+function sendToUser(userId, payload) {
+  if (!wssRef) return;
+  const id = String(userId);
+  const json = JSON.stringify(payload);
+  for (const client of wssRef.clients) {
+    if (client.readyState === client.OPEN && String(client.userId) === id) {
+      client.send(json);
+    }
+  }
+}
+
 // Serverstart + DB-Init + WebSocket
 (async () => {
   try {
@@ -366,6 +417,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
 
     const server = http.createServer(app);
     const wss = new WebSocketServer({ server });
+    wssRef = wss;
 
     wss.on('connection', async (ws, req) => {
       try {

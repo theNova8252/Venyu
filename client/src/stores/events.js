@@ -17,11 +17,15 @@ const API_CONFIG = {
 export const useEventsStore = defineStore('events', {
   state: () => ({
     list: [],
+    searchResults: [],
     loading: false,
+    searching: false,
     error: null,
     lastFetch: null,
     usingMockData: false,
-    clusterRadius: 0.5, 
+    clusterRadius: 0.5,
+    userLat: null,
+    userLng: null,
 
     // RSVP state (eventId -> { interested, going })
     rsvp: {},
@@ -111,172 +115,124 @@ export const useEventsStore = defineStore('events', {
 
 
   actions: {
-    // Fetch events from Ticketmaster API
-    async fetchTicketmaster(lat = 48.2082, lng = 16.3738, radius = 100) {
+    // Fetch music events from Ticketmaster API with location
+    async fetchTicketmaster({ lat, lng, radius = 150, keyword } = {}) {
       const params = new URLSearchParams({
         apikey: API_CONFIG.ticketmaster.key,
-        latlong: `${lat},${lng}`,
-        radius,
-        unit: 'km',
-        size: 100,
+        size: 200,
         sort: 'date,asc',
         classificationName: 'Music',
       });
 
-      try {
-        const response = await fetch(`${API_CONFIG.ticketmaster.baseUrl}/events.json?${params}`);
-
-        if (!response.ok) {
-          throw new Error(`Ticketmaster API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (!data._embedded?.events) return [];
-
-        return data._embedded.events.map((event) => ({
-          id: event.id,
-          title: event.name,
-          date: event.dates.start.localDate,
-          time: event.dates.start.localTime || null,
-          city: event._embedded?.venues?.[0]?.city?.name || 'Vienna',
-          venue: event._embedded?.venues?.[0]?.name || 'Unknown Venue',
-          lat: parseFloat(event._embedded?.venues?.[0]?.location?.latitude || lat),
-          lng: parseFloat(event._embedded?.venues?.[0]?.location?.longitude || lng),
-          url: event.url,
-          image: event.images?.[0]?.url || null,
-          category: event.classifications?.[0]?.genre?.name || 'concert',
-          artists: event._embedded?.attractions?.map((a) => a.name) || [event.name],
-          priceRange: event.priceRanges?.[0]
-            ? {
-                min: event.priceRanges[0].min,
-                max: event.priceRanges[0].max,
-                currency: event.priceRanges[0].currency,
-              }
-            : null,
-          source: 'ticketmaster',
-        }));
-      } catch (error) {
-        console.error('Ticketmaster fetch error:', error);
-        throw error;
+      if (lat != null && lng != null) {
+        params.set('latlong', `${lat},${lng}`);
+        params.set('radius', String(radius));
+        params.set('unit', 'km');
       }
+
+      if (keyword) {
+        params.set('keyword', keyword);
+      }
+
+      const response = await fetch(`${API_CONFIG.ticketmaster.baseUrl}/events.json?${params}`);
+
+      if (!response.ok) {
+        throw new Error(`Ticketmaster API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data._embedded?.events) return [];
+
+      return data._embedded.events.map((event) => ({
+        id: event.id,
+        title: event.name,
+        date: event.dates.start.localDate,
+        time: event.dates.start.localTime || null,
+        city: event._embedded?.venues?.[0]?.city?.name || 'Unknown City',
+        venue: event._embedded?.venues?.[0]?.name || 'Unknown Venue',
+        lat: parseFloat(event._embedded?.venues?.[0]?.location?.latitude || 0),
+        lng: parseFloat(event._embedded?.venues?.[0]?.location?.longitude || 0),
+        url: event.url,
+        image: event.images?.[0]?.url || null,
+        category: event.classifications?.[0]?.genre?.name || 'concert',
+        artists: event._embedded?.attractions?.map((a) => a.name) || [event.name],
+        priceRange: event.priceRanges?.[0]
+          ? {
+              min: event.priceRanges[0].min,
+              max: event.priceRanges[0].max,
+              currency: event.priceRanges[0].currency,
+            }
+          : null,
+        source: 'ticketmaster',
+      }));
     },
 
-    // Generate mock data for development
-    generateMockEvents(count = 20) {
-      const baseDate = new Date();
-      const venues = [
-        { name: 'Wiener Stadthalle', lat: 48.2021, lng: 16.334, city: 'Vienna' },
-        { name: 'Gasometer', lat: 48.185, lng: 16.4193, city: 'Vienna' },
-        { name: 'Arena Wien', lat: 48.1867, lng: 16.4183, city: 'Vienna' },
-        { name: 'Flex', lat: 48.2145, lng: 16.3803, city: 'Vienna' },
-        { name: 'Pannonia Fields', lat: 47.966, lng: 17.066, city: 'Nickelsdorf' },
-        { name: 'Óbuda Island', lat: 47.549549, lng: 19.05547, city: 'Budapest' },
-      ];
-
-      const artists = [
-        'The Weeknd',
-        'Billie Eilish',
-        'Arctic Monkeys',
-        'Taylor Swift',
-        'Coldplay',
-        'Ed Sheeran',
-        'Imagine Dragons',
-        'Metallica',
-        'Dua Lipa',
-        'Harry Styles',
-        'Radiohead',
-        'Foo Fighters',
-        'Tame Impala',
-        'The 1975',
-        'Glass Animals',
-        'alt-J',
-        'Bon Iver',
-        'Phoebe Bridgers',
-        'boygenius',
-        'Hozier',
-      ];
-
-      const genres = ['Rock', 'Pop', 'Electronic', 'Metal', 'Indie', 'Alternative'];
-
-      return Array.from({ length: count }, (_, i) => {
-        const date = new Date(baseDate);
-        date.setDate(date.getDate() + Math.floor(Math.random() * 365));
-
-        const venue = venues[Math.floor(Math.random() * venues.length)];
-        const artist = artists[Math.floor(Math.random() * artists.length)];
-        const genre = genres[Math.floor(Math.random() * genres.length)];
-
-        return {
-          id: `mock-${i}-${Date.now()}`,
-          title: `${artist} - ${
-            ['World Tour', 'Live', 'European Tour', '2026'][Math.floor(Math.random() * 4)]
-          }`,
-          date: date.toISOString().split('T')[0],
-          time: ['19:00', '20:00', '21:00'][Math.floor(Math.random() * 3)],
-          city: venue.city,
-          venue: venue.name,
-          lat: venue.lat + (Math.random() - 0.5) * 0.01, // slight variation
-          lng: venue.lng + (Math.random() - 0.5) * 0.01,
-          url: `https://www.ticketmaster.com/event/${i}`,
-          image: `https://picsum.photos/seed/${artist.replace(/\s/g, '')}/400/300`,
-          category: genre,
-          artists: [artist],
-          priceRange: {
-            min: 35 + Math.floor(Math.random() * 40),
-            max: 85 + Math.floor(Math.random() * 100),
-            currency: 'EUR',
-          },
-          source: 'mock',
-        };
-      }).sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Get user GPS position
+    getUserLocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 }
+        );
+      });
     },
 
-    // Main fetch method with fallback to mock data
-    async fetchNearby(lat = 48.2082, lng = 16.3738, radius = 100) {
+    // Main fetch — get user GPS, then fetch nearby events
+    async fetchNearby() {
       this.loading = true;
       this.error = null;
       this.usingMockData = false;
 
       try {
-        let events = [];
+        // Try to get GPS location
+        const loc = await this.getUserLocation();
+        const lat = loc?.lat ?? 48.2082;  // fallback: Vienna
+        const lng = loc?.lng ?? 16.3738;
+        this.userLat = lat;
+        this.userLng = lng;
 
-        // Try Ticketmaster API first
-        if (API_CONFIG.ticketmaster.key !== 'YOUR_TICKETMASTER_API_KEY') {
-          console.log('Fetching from Ticketmaster API...');
-          events = await this.fetchTicketmaster(lat, lng, radius);
-        }
+        const results = await this.fetchTicketmaster({ lat, lng, radius: 150 });
 
-        // If no events or API key not configured, use mock data
-        if (events.length === 0) {
-          console.log(
-            'Using mock data (configure VITE_TICKETMASTER_API_KEY in .env for real events)',
-          );
-          events = this.generateMockEvents(25);
-          this.usingMockData = true;
-        }
-
-        this.list = events;
+        this.list = results.filter((e) => e.lat !== 0 && e.lng !== 0);
         this.lastFetch = new Date();
 
-        // Load RSVP data for all events
         const ids = this.list.map((e) => String(e.id)).filter(Boolean);
         if (ids.length) {
           await this.loadRsvps(ids);
         }
 
-        console.log(
-          `Loaded ${this.list.length} events (${this.usingMockData ? 'mock' : 'real'} data)`,
-        );
+        console.log(`Loaded ${this.list.length} nearby events (${lat.toFixed(2)}, ${lng.toFixed(2)})`);
       } catch (e) {
         this.error = e?.message || String(e);
         console.error('Error fetching events:', e);
-
-        // Fallback to mock data on error
-        this.list = this.generateMockEvents(25);
-        this.usingMockData = true;
       } finally {
         this.loading = false;
+      }
+    },
+
+    // Search events by keyword (worldwide, no location filter)
+    async searchEvents(keyword) {
+      if (!keyword || !keyword.trim()) {
+        this.searchResults = [];
+        return;
+      }
+      this.searching = true;
+      this.error = null;
+      try {
+        const results = await this.fetchTicketmaster({ keyword: keyword.trim() });
+        this.searchResults = results.filter((e) => e.lat !== 0 && e.lng !== 0);
+      } catch (e) {
+        this.error = e?.message || String(e);
+        console.error('Search error:', e);
+        this.searchResults = [];
+      } finally {
+        this.searching = false;
       }
     },
 

@@ -191,6 +191,33 @@
         </transition>
       </router-view>
     </q-page-container>
+
+    <!-- Global Match Popup -->
+    <q-dialog v-model="showMatchPopup" persistent>
+      <div class="match-popup">
+        <div class="match-popup__content">
+          <div class="match-popup__avatars">
+            <q-avatar size="72px" class="match-popup__av">
+              <img :src="userAvatar" />
+            </q-avatar>
+            <div class="match-popup__heart">
+              <q-icon name="favorite" size="22px" color="pink-5" />
+            </div>
+            <q-avatar size="72px" class="match-popup__av">
+              <img :src="matchedUser?.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=match'" />
+            </q-avatar>
+          </div>
+          <h2 class="match-popup__title">It's a Match!</h2>
+          <p class="match-popup__sub">
+            You and <strong>{{ matchedUser?.name }}</strong> both liked each other
+          </p>
+          <div class="match-popup__actions">
+            <q-btn flat no-caps class="match-popup__btn-ghost" label="Dismiss" @click="dismissMatch" />
+            <q-btn unelevated no-caps class="match-popup__btn-primary" icon="chat_bubble" label="Send Message" @click="goToMatchChat" />
+          </div>
+        </div>
+      </div>
+    </q-dialog>
   </q-layout>
 </template>
 
@@ -198,11 +225,58 @@
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from '@/stores/auth';
+import { usePresenceStore } from '@/stores/active';
+import { useChatsStore } from '@/stores/chats';
 import { api } from '@/api';
+import { Notify } from 'quasar';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+const presenceStore = usePresenceStore();
+const chatsStore = useChatsStore();
+
+// Match popup state
+const showMatchPopup = ref(false);
+const matchedUser = ref(null);
+const matchRoomId = ref(null);
+
+// Watch for incoming match events from the presence WS
+watch(() => presenceStore.pendingMatch, (match) => {
+  if (!match) return;
+  matchedUser.value = match.user;
+  matchRoomId.value = match.roomId;
+  showMatchPopup.value = true;
+
+  // Also show a notification
+  Notify.create({
+    message: `You matched with ${match.user?.name || 'someone'}!`,
+    color: 'pink-6',
+    icon: 'favorite',
+    position: 'top',
+    timeout: 5000,
+  });
+
+  // Refresh chat list
+  chatsStore.fetchChats();
+
+  presenceStore.clearMatch();
+});
+
+const dismissMatch = () => {
+  showMatchPopup.value = false;
+  matchedUser.value = null;
+  matchRoomId.value = null;
+};
+
+const goToMatchChat = () => {
+  showMatchPopup.value = false;
+  if (matchRoomId.value) {
+    router.push({ name: 'ChatView', params: { roomId: matchRoomId.value } });
+  }
+  matchedUser.value = null;
+  matchRoomId.value = null;
+};
 
 // Currently playing state
 const nowPlaying = ref(null);
@@ -248,6 +322,11 @@ onMounted(async () => {
   }, 5000);
   // Tick progress every 1s for smooth UI
   npTickInterval = setInterval(tickProgress, 1000);
+
+  // Connect presence WS so we can receive match events
+  if (auth.isAuthenticated) {
+    presenceStore.connect();
+  }
 
   // Pause/resume when tab visibility changes
   document.addEventListener('visibilitychange', onVisChange);
@@ -825,5 +904,97 @@ aside.glass-drawer {
 body,
 .q-page-container {
   background: #09090b;
+}
+
+/* ─── Match Popup ────────────────────────────────────── */
+.match-popup {
+  background: rgba(16, 16, 28, 0.96);
+  backdrop-filter: blur(32px) saturate(1.5);
+  -webkit-backdrop-filter: blur(32px) saturate(1.5);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 28px;
+  padding: 40px 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(236, 72, 153, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.match-popup__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.match-popup__avatars {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 20px;
+}
+
+.match-popup__av {
+  border: 3px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.match-popup__heart {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(236, 72, 153, 0.15);
+  border: 2px solid rgba(236, 72, 153, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 -8px;
+  z-index: 1;
+}
+
+.match-popup__title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #ec4899, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.match-popup__sub {
+  margin: 8px 0 24px;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.match-popup__sub strong {
+  color: #fff;
+}
+
+.match-popup__actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.match-popup__btn-ghost {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.match-popup__btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
+  color: #fff !important;
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
 }
 </style>

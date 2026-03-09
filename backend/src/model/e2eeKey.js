@@ -5,7 +5,6 @@ class E2eeKey extends Model {}
 
 E2eeKey.init(
   {
-    // ✅ passt zu User.id (UUID)
     userId: {
       type: DataTypes.UUID,
       allowNull: false,
