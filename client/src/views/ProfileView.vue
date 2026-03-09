@@ -44,7 +44,10 @@
 
           <!-- Identity -->
           <div class="hero-identity">
-            <h1 class="hero-name">{{ user?.display_name || 'Your Profile' }}</h1>
+            <h1 class="hero-name">
+              {{ profileName }}
+              <span v-if="profileAge != null" class="hero-age">, {{ profileAge }}</span>
+            </h1>
             <div class="hero-meta">
               <span v-if="user?.email" class="meta-chip">
                 <q-icon name="mail" size="14px" />
@@ -243,6 +246,10 @@ const $q = useQuasar();
 const auth = useAuthStore();
 
 const user = computed(() => auth.user);
+const profileName = computed(() => user.value?.displayName || user.value?.display_name || 'Your Profile');
+const profileAge = computed(() =>
+  Number.isFinite(Number(user.value?.age)) ? Number(user.value.age) : null
+);
 const resolveAvatarUrl = (url) => {
   if (!url) return null;
 
@@ -820,6 +827,11 @@ const deleteAccount = async () => {
   margin: 0;
   color: #f4f4f5;
   line-height: 1.2;
+}
+
+.hero-age {
+  font-weight: 500;
+  color: #a1a1aa;
 }
 
 .hero-meta {

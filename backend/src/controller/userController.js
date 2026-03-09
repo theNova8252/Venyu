@@ -28,12 +28,17 @@ export const getMeProfile = async (req, res, next) => {
 
     return res.json({
       id: user.id,
+      spotifyId: user.spotifyId,
       displayName: user.displayName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      birthDate: user.birthDate,
       email: user.email,
       avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
       bio: user.bio,
+      age: user.age,
       isVisible: user.isVisible,
 
       genres: user.genres,

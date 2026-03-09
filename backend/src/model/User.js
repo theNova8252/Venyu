@@ -12,6 +12,12 @@ class User extends Model {
       spotifyId: values.spotifyId,
       displayName: values.displayName,
       display_name: values.displayName, // Keep both for compatibility
+      firstName: values.firstName,
+      first_name: values.firstName, // Keep both for compatibility
+      lastName: values.lastName,
+      last_name: values.lastName, // Keep both for compatibility
+      birthDate: values.birthDate,
+      birth_date: values.birthDate, // Keep both for compatibility
       email: values.email,
       avatarUrl: values.avatarUrl,
       avatar_url: values.avatarUrl, // Keep both for compatibility
@@ -38,6 +44,9 @@ User.init(
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     spotifyId: { type: DataTypes.STRING, allowNull: false, unique: true, field: 'spotify_id' },
     displayName: { type: DataTypes.STRING, field: 'display_name' },
+    firstName: { type: DataTypes.STRING, field: 'first_name' },
+    lastName: { type: DataTypes.STRING, field: 'last_name' },
+    birthDate: { type: DataTypes.DATEONLY, field: 'birth_date' },
     email: { type: DataTypes.STRING },
     avatarUrl: { type: DataTypes.TEXT, field: 'avatar_url' },
     country: { type: DataTypes.STRING(2) },

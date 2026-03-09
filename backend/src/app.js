@@ -282,6 +282,7 @@ app.get('/api/chat/rooms', async (req, res, next) => {
       user: {
         id: u.id,
         name: u.displayName || 'Unknown',
+        age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
         avatar: u.avatarUrl || 'https://i.pravatar.cc/150?u=' + u.id,
         bio: u.bio || '',
       },

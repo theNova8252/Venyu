@@ -102,6 +102,7 @@ router.get('/candidates', async (req, res, next) => {
     const myEventIds = new Set(myRsvps.map((r) => r.eventId));
 
     const result = others.map((u, index) => {
+      const displayName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.displayName;
       const artistNames = Array.isArray(u.topArtists)
         ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
         : [];
@@ -132,8 +133,8 @@ router.get('/candidates', async (req, res, next) => {
       const candidate = {
         id: u.id,
         userId: u.id,
-        name: u.displayName || 'Unknown',
-        age: u.age || 25,
+        name: displayName || 'Unknown',
+        age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
         avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
         bio: u.bio || 'Music lover',
         distance: 'Nearby',

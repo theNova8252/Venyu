@@ -6,12 +6,13 @@
         <!-- Left Side - Form -->
         <div class="left-side">
           <div class="form-container">
-            <h1 class="form-title">Create an account</h1>
+            <h1 class="form-title">Continue with Spotify</h1>
             <p class="form-subtitle">
-              Enter your details below to create your account
+              Add your name and birth date first. Sign in only works with an existing
+              Spotify account.
             </p>
 
-            <q-form @submit="handleSignup" class="signup-form">
+            <q-form ref="loginFormRef" @submit.prevent="handleSignup" class="signup-form">
               <div class="name-row">
                 <div class="form-field">
                   <label class="field-label">First Name</label>
@@ -20,31 +21,30 @@
                     outlined
                     dense
                     class="custom-input"
-                    :rules="[(val) => !!val || 'Required']"
+                    :rules="[(val) => !!String(val || '').trim() || 'Required']"
                   />
                 </div>
 
                 <div class="form-field">
-                  <label class="field-label">Last Name</label>
+                  <label class="field-label">Last Name (Optional)</label>
                   <q-input
                     v-model="formData.lastName"
                     outlined
                     dense
                     class="custom-input"
-                    :rules="[(val) => !!val || 'Required']"
                   />
                 </div>
               </div>
 
               <div class="form-field">
-                <label class="field-label">Birthday</label>
+                <label class="field-label">Birth Date</label>
                 <q-input
-                  v-model="formData.birthday"
+                  v-model="formData.birthDate"
                   outlined
                   dense
                   type="date"
                   class="custom-input"
-                  :rules="[(val) => !!val || 'Required']"
+                  :rules="birthDateRules"
                 />
               </div>
 
@@ -52,15 +52,9 @@
                 type="submit"
                 unelevated
                 class="signup-btn"
-                label="Sign up"
+                label="Continue with Spotify"
                 no-caps
-              />
-              <q-btn
-                outline
-                color="green-5"
-                class="q-mt-lg"
-                label="Login with Spotify"
-                @click="auth.login"
+                :loading="isConnecting"
               />
 
               <p class="terms-text">
@@ -213,15 +207,49 @@
 <script setup>
 import { ref } from "vue";
 import { useAuthStore } from "@/stores/auth";
+import { useRouter } from "vue-router";
 
 const auth = useAuthStore();
+const router = useRouter();
 
+const loginFormRef = ref(null);
 const step = ref("login");
+const isConnecting = ref(false);
 const formData = ref({
   firstName: "",
   lastName: "",
-  birthday: "",
+  birthDate: "",
 });
+
+const calculateAgeFromBirthDate = (birthDate) => {
+  if (!birthDate) return null;
+
+  const birth = new Date(`${birthDate}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  const dayDiff = today.getDate() - birth.getDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age;
+};
+
+const birthDateRules = [
+  (value) => String(value || "").trim().length > 0 || "Required",
+  (value) => {
+    const age = calculateAgeFromBirthDate(value);
+    return Number.isInteger(age) || "Enter a valid birth date";
+  },
+  (value) => {
+    const age = calculateAgeFromBirthDate(value);
+    return age >= 16 || "You must be 16+";
+  },
+];
 
 const genres = [
   "Pop",
@@ -264,9 +292,28 @@ const artists = [
 const selectedGenres = ref([]);
 const selectedArtists = ref([]);
 
-const handleSignup = () => {
-  // Animate to next step
-  step.value = "preferences";
+const handleSignup = async () => {
+  if (isConnecting.value) return;
+
+  const isValid = await loginFormRef.value?.validate?.();
+  if (!isValid) return;
+
+  if (calculateAgeFromBirthDate(formData.value.birthDate) < 16) {
+    return router.replace({ path: "/", query: { error: "underage" } });
+  }
+
+  isConnecting.value = true;
+
+  try {
+    await auth.login("/swipe", {
+      firstName: formData.value.firstName,
+      lastName: formData.value.lastName,
+      birthDate: formData.value.birthDate,
+    });
+  } catch (error) {
+    console.error("Spotify login error:", error);
+    isConnecting.value = false;
+  }
 };
 
 const toggleGenre = (genre) => {
@@ -291,10 +338,11 @@ const completeSetup = () => {
   // Create complete user profile
   const userData = {
     id: "demo-user",
-    name: `${formData.value.firstName} ${formData.value.lastName}`,
+    name: `${formData.value.firstName} ${formData.value.lastName}`.trim(),
     firstName: formData.value.firstName,
     lastName: formData.value.lastName,
-    birthday: formData.value.birthday,
+    birthDate: formData.value.birthDate,
+    age: calculateAgeFromBirthDate(formData.value.birthDate),
     topArtists:
       selectedArtists.value.length > 0
         ? selectedArtists.value

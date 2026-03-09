@@ -404,17 +404,31 @@
         </div>
       </div>
     </footer>
+
+    <SpotifySignupDialog
+      v-model="spotifySignupOpen"
+      :loading="spotifySignupLoading"
+      @submit="handleSpotifySignup"
+    />
   </q-page>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import SpotifySignupDialog from '@/components/SpotifySignupDialog.vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+const $q = useQuasar()
 
 const scrolled = ref(false)
 const mobileMenuOpen = ref(false)
+const spotifySignupOpen = ref(false)
+const spotifySignupLoading = ref(false)
 const mapCanvas = ref(null)
 const mapBgRef = ref(null)
 let mapAnimationId = null
@@ -426,8 +440,46 @@ const stats = ref([
   { label: 'Cities', value: 150, display: '150+' }
 ])
 
+const calculateAgeFromBirthDate = (birthDate) => {
+  if (!birthDate) return null
+
+  const birth = new Date(`${birthDate}T00:00:00`)
+  if (Number.isNaN(birth.getTime())) return null
+
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const monthDiff = today.getMonth() - birth.getMonth()
+  const dayDiff = today.getDate() - birth.getDate()
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1
+  }
+
+  return age
+}
+
 const onSpotifyConnect = () => {
-  auth.login("/swipe")
+  closeMobileMenu()
+  spotifySignupOpen.value = true
+}
+
+const handleSpotifySignup = async (profile) => {
+  if (calculateAgeFromBirthDate(profile.birthDate) < 16) {
+    spotifySignupOpen.value = false
+    await router.replace({ path: '/', query: { ...route.query, error: 'underage' } })
+    return
+  }
+
+  spotifySignupLoading.value = true
+  spotifySignupOpen.value = false
+
+  try {
+    await auth.login('/swipe', profile)
+  } catch (error) {
+    console.error('Spotify login error:', error)
+    spotifySignupLoading.value = false
+    spotifySignupOpen.value = true
+  }
 }
 
 const scrollToTop = () => {
@@ -448,6 +500,25 @@ watch(mobileMenuOpen, (open) => {
     document.body.style.touchAction = ''
   }
 })
+
+watch(
+  () => route.query.error,
+  async (error) => {
+    if (error !== 'underage') return
+
+    $q.notify({
+      color: 'negative',
+      message: 'You must be 16+ to use Venyu.',
+      position: 'top',
+      timeout: 2500,
+    })
+
+    const query = { ...route.query }
+    delete query.error
+    await router.replace({ path: route.path, query })
+  },
+  { immediate: true },
+)
 
 let scrollTicking = false
 const handleScroll = () => {

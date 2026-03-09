@@ -26,9 +26,138 @@ const COOKIE_OPTS_BASE = {
   path: '/',
 };
 
+const normalizeBase64Url = (value) => {
+  if (typeof value !== 'string') return '';
+
+  const normalized = value
+    .trim()
+    .replace(/ /g, '+')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const padding = normalized.length % 4;
+  if (padding === 0) return normalized;
+
+  return normalized.padEnd(normalized.length + (4 - padding), '=');
+};
+
+const parseAuthState = (state) => {
+  if (typeof state !== 'string' || !state) return {};
+
+  try {
+    const decoded = Buffer.from(normalizeBase64Url(state), 'base64').toString('utf8');
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const normalizeName = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+};
+
+const normalizeBirthDate = (value) => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+
+  const [year, month, day] = trimmed.split('-').map((part) => Number.parseInt(part, 10));
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return trimmed;
+};
+
+const calculateAgeFromBirthDate = (birthDate) => {
+  const normalized = normalizeBirthDate(birthDate);
+  if (!normalized) return null;
+
+  const today = new Date();
+  const birth = new Date(`${normalized}T00:00:00Z`);
+
+  let age = today.getUTCFullYear() - birth.getUTCFullYear();
+  const monthDiff = today.getUTCMonth() - birth.getUTCMonth();
+  const dayDiff = today.getUTCDate() - birth.getUTCDate();
+
+  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+    age -= 1;
+  }
+
+  return age >= 0 && age <= 120 ? age : null;
+};
+
+const getSignupDataFromState = (state) => {
+  const parsed = parseAuthState(state);
+  const rawProfile = parsed.profile && typeof parsed.profile === 'object' ? parsed.profile : {};
+  const birthDate = normalizeBirthDate(rawProfile.birthDate);
+
+  return {
+    returnTo: typeof parsed.returnTo === 'string' && parsed.returnTo ? parsed.returnTo : null,
+    profile: {
+      firstName: normalizeName(rawProfile.firstName),
+      lastName: normalizeName(rawProfile.lastName),
+      birthDate,
+      age: calculateAgeFromBirthDate(birthDate),
+    },
+  };
+};
+
+const hasRequiredSignupProfile = (profile) => Boolean(profile?.firstName) && profile?.age != null;
+const isAllowedAge = (profile) => Number.isInteger(profile?.age) && profile.age >= 16;
+
+const buildDisplayName = (profile, spotifyDisplayName) => {
+  const fullName = [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim();
+  return fullName || spotifyDisplayName || null;
+};
+
+const getFrontendUrl = (returnTo) => {
+  if (typeof returnTo === 'string' && returnTo) {
+    try {
+      const parsed = new URL(returnTo);
+      return `${parsed.origin}/`;
+    } catch {
+      // fall through
+    }
+  }
+
+  return process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
+};
+
+const redirectToLandingError = (res, returnTo, error) => {
+  const url = new URL(getFrontendUrl(returnTo));
+  url.pathname = '/';
+  url.searchParams.set('error', error);
+  return res.redirect(url.toString());
+};
+
 // ======================= LOGIN =======================
 export const login = (req, res) => {
-  const state = req.query.state || '';
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  const signupState = getSignupDataFromState(state);
+  const { profile } = signupState;
+
+  if (!hasRequiredSignupProfile(profile)) {
+    return res.status(400).json({
+      error: 'missing_signup_profile',
+      message: 'firstName and birthDate are required before Spotify login',
+    });
+  }
+
+  if (!isAllowedAge(profile)) {
+    return redirectToLandingError(res, signupState.returnTo, 'underage');
+  }
+
   return res.redirect(buildAuthUrl(state));
 };
 
@@ -37,6 +166,15 @@ export const callback = async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!code) return res.status(400).send('Missing code');
+
+    const signupState = getSignupDataFromState(state);
+    if (!hasRequiredSignupProfile(signupState.profile)) {
+      return res.status(400).send('missing_signup_profile');
+    }
+
+    if (!isAllowedAge(signupState.profile)) {
+      return redirectToLandingError(res, signupState.returnTo, 'underage');
+    }
 
     const tokens = await exchangeCodeForTokens(code);
 
@@ -103,11 +241,15 @@ export const callback = async (req, res) => {
     let user = await User.findOne({ where: { spotifyId: meProfile.id } });
 
     const userPayload = {
-      displayName: meProfile.display_name ?? null,
+      displayName: buildDisplayName(signupState.profile, meProfile.display_name ?? null),
+      firstName: signupState.profile.firstName,
+      lastName: signupState.profile.lastName,
+      birthDate: signupState.profile.birthDate,
       email: meProfile.email ?? null,
       avatarUrl: meProfile.images?.[0]?.url ?? null,
       country: meProfile.country ?? null,
       product: meProfile.product ?? null,
+      age: signupState.profile.age,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
       tokenExpiresAt: expiresAt,
@@ -139,15 +281,7 @@ export const callback = async (req, res) => {
     }
 
     // redirect back
-    const ret = (() => {
-      try {
-        return JSON.parse(Buffer.from(state || '', 'base64').toString())?.returnTo;
-      } catch {
-        return null;
-      }
-    })();
-
-    const to = ret || process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
+    const to = signupState.returnTo || process.env.FRONTEND_URL || 'http://127.0.0.1:8080';
     return res.redirect(to);
   } catch (e) {
     console.error('Callback error:', e?.message || e);
@@ -167,11 +301,18 @@ export const me = async (req, res, next) => {
 
     return res.json({
       id: user.id,
+      spotifyId: user.spotifyId,
       displayName: user.displayName,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      birthDate: user.birthDate,
       email: user.email,
       avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
+      age: user.age,
+      bio: user.bio,
+      isVisible: user.isVisible,
       topArtists: user.topArtists,
       topTracks: user.topTracks,
       recentlyPlayed: user.recentlyPlayed,

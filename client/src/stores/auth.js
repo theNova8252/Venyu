@@ -1,5 +1,58 @@
 import { defineStore } from 'pinia';
 
+const normalizeSignupProfile = (profile = {}) => {
+  const firstName = typeof profile.firstName === 'string' ? profile.firstName.trim() : '';
+  const lastName = typeof profile.lastName === 'string' ? profile.lastName.trim() : '';
+  const birthDate = typeof profile.birthDate === 'string' ? profile.birthDate.trim() : '';
+
+  return {
+    firstName,
+    lastName,
+    birthDate,
+  };
+};
+
+const toBase64Url = (value) =>
+  value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+
+const fromBase64Url = (value) => {
+  if (typeof value !== 'string') return '';
+
+  const normalized = value
+    .trim()
+    .replace(/ /g, '+')
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const padding = normalized.length % 4;
+  if (padding === 0) return normalized;
+
+  return normalized.padEnd(normalized.length + (4 - padding), '=');
+};
+
+const encodeAuthState = (payload) => {
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let binary = '';
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return toBase64Url(btoa(binary));
+};
+
+const decodeAuthState = (state) => {
+  try {
+    const binary = atob(fromBase64Url(state));
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    console.error('Error decoding auth state:', error);
+    return null;
+  }
+};
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -35,13 +88,21 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async login(returnTo = '/swipe') {
-      // Build state parameter with return URL
-      const state = btoa(
-        JSON.stringify({
-          returnTo: `${window.location.origin}${returnTo}`,
-        }),
-      );
+    async login(returnTo = '/swipe', profile = {}) {
+      const signupProfile = normalizeSignupProfile(profile);
+      if (!signupProfile.firstName || !signupProfile.birthDate) {
+        throw new Error('signup_profile_required');
+      }
+
+      const target =
+        typeof returnTo === 'string' && /^https?:\/\//.test(returnTo)
+          ? returnTo
+          : `${window.location.origin}${returnTo}`;
+
+      const state = encodeAuthState({
+        returnTo: target,
+        profile: signupProfile,
+      });
 
       // Redirect to Spotify auth with state
       window.location.href = `/api/spotify/auth/login?state=${encodeURIComponent(state)}`;
@@ -56,17 +117,16 @@ export const useAuthStore = defineStore('auth', {
       const state = urlParams.get('state');
 
       if (state) {
-        try {
-          const decoded = JSON.parse(atob(state));
-          const returnTo = decoded.returnTo;
+        const decoded = decodeAuthState(state);
+        const returnTo = decoded?.returnTo;
 
-          if (returnTo) {
-            // Extract path from full URL
+        if (returnTo) {
+          try {
             const url = new URL(returnTo);
             return url.pathname;
+          } catch (error) {
+            console.error('Error parsing return URL:', error);
           }
-        } catch (error) {
-          console.error('Error parsing state:', error);
         }
       }
 

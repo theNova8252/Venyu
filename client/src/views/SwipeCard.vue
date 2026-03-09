@@ -113,6 +113,13 @@
                 </div>
               </div>
 
+              <div class="card__facts" v-if="card.age != null">
+                <span class="fact-pill">
+                  <q-icon name="cake" size="14px" />
+                  {{ card.age }} years old
+                </span>
+              </div>
+
               <!-- Bio -->
               <p class="card__bio" v-if="card.bio">{{ card.bio }}</p>
 
@@ -861,6 +868,25 @@ onUnmounted(() => {
   line-height: 1.45;
   color: #a1a1aa;
   margin: 0;
+}
+
+.card__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.fact-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(236, 72, 153, 0.1);
+  border: 1px solid rgba(236, 72, 153, 0.18);
+  color: #fbcfe8;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 /* ─── Sections (artists / tracks / genres) ───────────── */
