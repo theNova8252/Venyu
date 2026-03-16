@@ -121,17 +121,28 @@ router.get('/candidates', async (req, res, next) => {
         ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
         : [];
 
-      const uGenres = Array.isArray(uSpotify?.genres) ? uSpotify.genres : [];
+      const uGenresAll = Array.isArray(uSpotify?.genres) ? uSpotify.genres : [];
 
-      // Match score breakdown
-      const uGenreSet = new Set(uGenres);
-      const sharedGenres = [...meGenres].filter((g) => uGenreSet.has(g));
-      const genreUnion = new Set([...meGenres, ...uGenreSet]);
+      // Limit to top 6 genres and top 4 artists for meaningful match scores
+      const MAX_GENRES = 6;
+      const MAX_ARTISTS = 4;
+
+      const meGenresLimited = [...meGenres].slice(0, MAX_GENRES);
+      const uGenresLimited = uGenresAll.slice(0, MAX_GENRES);
+
+      const meArtistsLimited = [...meArtistIds].slice(0, MAX_ARTISTS);
+      const uArtistsLimited = artistIds.slice(0, MAX_ARTISTS);
+
+      // Match score breakdown using limited sets
+      const uGenreSet = new Set(uGenresLimited);
+      const meGenreSet = new Set(meGenresLimited);
+      const sharedGenres = meGenresLimited.filter((g) => uGenreSet.has(g));
+      const genreUnion = new Set([...meGenresLimited, ...uGenresLimited]);
       const genreScore = genreUnion.size === 0 ? 0 : sharedGenres.length / genreUnion.size;
 
-      const uArtistSet = new Set(artistIds);
-      const sharedArtists = [...meArtistIds].filter((a) => uArtistSet.has(a));
-      const artistMax = Math.max(meArtistIds.size, uArtistSet.size);
+      const uArtistSet = new Set(uArtistsLimited);
+      const sharedArtists = meArtistsLimited.filter((a) => uArtistSet.has(a));
+      const artistMax = Math.max(meArtistsLimited.length, uArtistsLimited.length);
       const artistScore = artistMax === 0 ? 0 : sharedArtists.length / artistMax;
 
       // Event overlap
@@ -159,7 +170,7 @@ router.get('/candidates', async (req, res, next) => {
             }))
             .filter((t) => t.name)
           : [],
-        genres: uGenres,
+        genres: uGenresLimited,
         eventRsvps: rsvpsByUser[u.id] || [],
         matchScore: totalScore || 80,
         matchBreakdown: {
