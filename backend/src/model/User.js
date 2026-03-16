@@ -1,4 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
+// eslint-disable-next-line import/no-cycle
 import { sequelize } from './db.js';
 
 class User extends Model {
@@ -11,7 +12,6 @@ class User extends Model {
       id: values.id,
       spotifyId: values.spotifyId,
       displayName: values.displayName,
-<<<<<<< HEAD
       display_name: values.displayName, // Keep both for compatibility
       firstName: values.firstName,
       first_name: values.firstName, // Keep both for compatibility
@@ -19,8 +19,6 @@ class User extends Model {
       last_name: values.lastName, // Keep both for compatibility
       birthDate: values.birthDate,
       birth_date: values.birthDate, // Keep both for compatibility
-=======
->>>>>>> 53f80857782363d717655499852d583e9e28e7a5
       email: values.email,
       avatarUrl: values.avatarUrl,
       country: values.country,
@@ -36,7 +34,6 @@ class User extends Model {
 
 User.init(
   {
-<<<<<<< HEAD
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     spotifyId: { type: DataTypes.STRING, allowNull: false, unique: true, field: 'spotify_id' },
     displayName: { type: DataTypes.STRING, field: 'display_name' },
@@ -57,47 +54,6 @@ User.init(
     topTracks: { type: DataTypes.JSONB, field: 'top_tracks' },
     recentlyPlayed: { type: DataTypes.JSONB, field: 'recently_played' },
     genres: { type: DataTypes.ARRAY(DataTypes.STRING), field: 'genres' },
-=======
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
-    spotifyId: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      unique: true,
-      field: 'spotify_id',
-    },
-    displayName: {
-      type: DataTypes.STRING,
-      field: 'display_name',
-    },
-    email: {
-      type: DataTypes.STRING,
-    },
-    avatarUrl: {
-      type: DataTypes.TEXT,
-      field: 'avatar_url',
-    },
-    country: {
-      type: DataTypes.STRING(2),
-    },
-    product: {
-      type: DataTypes.STRING,
-    },
-    bio: {
-      type: DataTypes.TEXT,
-    },
-    age: {
-      type: DataTypes.INTEGER,
-    },
-    isVisible: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      field: 'is_visible',
-    },
->>>>>>> 53f80857782363d717655499852d583e9e28e7a5
   },
   {
     sequelize,

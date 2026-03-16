@@ -1,6 +1,6 @@
 import { fetchMe } from '../model/spotifyModel.js';
 import User from '../model/User.js';
-import E2eeKey from '../model/E2eeKey.js';
+import E2eeKey from '../model/e2eeKey.js';
 
 async function getCurrentUser(req) {
   const { at } = req.cookies || {};
@@ -29,7 +29,7 @@ function parseRoom(roomId) {
 }
 
 // POST /api/chat/e2ee/public-key
-export async function upsertMyPublicKey(req, res, next) {
+export async function upsertMyPublicKey(req, res, _next) {
   try {
     const me = await getCurrentUser(req);
     const { publicKeyJwk } = req.body || {};
@@ -37,7 +37,7 @@ export async function upsertMyPublicKey(req, res, next) {
     if (!publicKeyJwk) return res.status(400).json({ error: 'missing_publicKeyJwk' });
 
     await E2eeKey.upsert({
-      userId: String(me.id),     // ✅ UUID string
+      userId: String(me.id), // ✅ UUID string
       publicKeyJwk,
     });
 

@@ -1,4 +1,5 @@
 import { DataTypes, Model } from 'sequelize';
+// eslint-disable-next-line import/no-cycle
 import { sequelize } from './db.js';
 
 class Like extends Model {}

@@ -6,6 +6,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { Op } from 'sequelize';
 
+import http from 'http';
+import { WebSocketServer } from 'ws';
+import cookie from 'cookie';
 import { initDb } from './model/db.js';
 
 import spotifyRoutes from './api/routes/spotifyRoutes.js';
@@ -14,15 +17,10 @@ import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import eventRoutes from './api/routes/eventRoutes.js';
 import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
-import { autoRefreshToken } from './middleware/autoRefresh.js';
-
-import http from 'http';
-import { WebSocketServer } from 'ws';
-import cookie from 'cookie';
+import autoRefreshToken from './middleware/autoRefresh.js';
 
 // Modelle
 import User from './model/User.js';
-import SpotifyToken from './model/SpotifyToken.js';
 import SpotifyData from './model/SpotifyData.js';
 import ChatMessage from './model/ChatMessage.js';
 import Like from './model/Like.js';
@@ -104,6 +102,21 @@ function getArtistId(artist) {
   return null;
 }
 
+// stored when server boots so HTTP routes can broadcast
+let wssRef = null;
+
+// Send a message to a specific user via any open presence WS connection
+function sendToUser(userId, payload) {
+  if (!wssRef) return;
+  const id = String(userId);
+  const json = JSON.stringify(payload);
+  for (const client of wssRef.clients) {
+    if (client.readyState === client.OPEN && String(client.userId) === id) {
+      client.send(json);
+    }
+  }
+}
+
 // ---------- Auto-refresh expired tokens ----------
 app.use('/api', autoRefreshToken);
 
@@ -123,8 +136,12 @@ app.get('/api/matches/candidates', async (req, res, next) => {
     const mySpotifyData = await SpotifyData.findByPk(me.id);
     const myTopArtists = toArray(mySpotifyData?.topArtists);
     const myArtistIds = new Set(myTopArtists.map(getArtistId).filter(Boolean));
-    const myArtistNames = new Set(myTopArtists.map(getArtistName).filter(Boolean).map(n => n.toLowerCase()));
-    const myGenres = new Set(toArray(mySpotifyData?.genres).map((genre) => String(genre).toLowerCase()));
+    const myArtistNames = new Set(
+      myTopArtists.map(getArtistName).filter(Boolean).map((n) => n.toLowerCase()),
+    );
+    const myGenres = new Set(
+      toArray(mySpotifyData?.genres).map((genre) => String(genre).toLowerCase()),
+    );
 
     // Filter out already liked users
     const myLikes = await Like.findAll({
@@ -156,9 +173,9 @@ app.get('/api/matches/candidates', async (req, res, next) => {
     const otherIds = others.map((u) => u.id);
     const allRsvps = otherIds.length
       ? await EventRsvp.findAll({
-          where: { userId: { [Op.in]: otherIds }, interested: true },
-          attributes: ['userId', 'eventId', 'interested', 'going'],
-        })
+        where: { userId: { [Op.in]: otherIds }, interested: true },
+        attributes: ['userId', 'eventId', 'interested', 'going'],
+      })
       : [];
 
     const rsvpsByUser = {};
@@ -181,7 +198,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
       const topArtists = candidateTopArtists.map(getArtistName).filter(Boolean);
 
       // --- Genre matching (Jaccard similarity) ---
-      const uGenreSet = new Set(candidateGenres.map(g => g.toLowerCase()));
+      const uGenreSet = new Set(candidateGenres.map((g) => g.toLowerCase()));
       const sharedGenresList = [...myGenres].filter((g) => uGenreSet.has(g));
       const genreUnion = new Set([...myGenres, ...uGenreSet]);
       const genreRatio = genreUnion.size === 0 ? 0 : sharedGenresList.length / genreUnion.size;
@@ -189,19 +206,26 @@ app.get('/api/matches/candidates', async (req, res, next) => {
 
       // --- Artist matching ---
       const uArtistIds = new Set(candidateTopArtists.map(getArtistId).filter(Boolean));
-      const uArtistNames = new Set(candidateTopArtists.map(getArtistName).filter(Boolean).map(n => n.toLowerCase()));
+      const uArtistNames = new Set(
+        candidateTopArtists.map(getArtistName).filter(Boolean).map((n) => n.toLowerCase()),
+      );
       // Match by id OR name
       const sharedById = [...myArtistIds].filter((id) => uArtistIds.has(id)).length;
       const sharedByName = [...myArtistNames].filter((n) => uArtistNames.has(n)).length;
       const sharedArtistCount = Math.max(sharedById, sharedByName);
-      const artistMax = Math.max(myArtistIds.size || myArtistNames.size, uArtistIds.size || uArtistNames.size);
+      const artistMax = Math.max(
+        myArtistIds.size || myArtistNames.size,
+        uArtistIds.size || uArtistNames.size,
+      );
       const artistRatio = artistMax === 0 ? 0 : sharedArtistCount / artistMax;
       const artistScore = Math.round(artistRatio * 30);
 
       // --- Event overlap ---
       const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
       const sharedEventsList = userEventIds.filter((eid) => myEventIds.has(eid));
-      const eventScore = sharedEventsList.length > 0 ? Math.min(20, sharedEventsList.length * 10) : 0;
+      const eventScore = sharedEventsList.length > 0
+        ? Math.min(20, sharedEventsList.length * 10)
+        : 0;
 
       const totalScore = genreScore + artistScore + eventScore;
 
@@ -242,7 +266,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
     return res.json(result);
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });
-    next(e);
+    return next(e);
   }
 });
 
@@ -297,7 +321,7 @@ app.post('/api/matches/:otherUserId/like', async (req, res, next) => {
     return res.json({ isMatch: false });
   } catch (e) {
     if (e.status) return res.status(e.status).json({ error: e.message });
-    next(e);
+    return next(e);
   }
 });
 
@@ -321,14 +345,14 @@ app.get('/api/chat/rooms', async (req, res, next) => {
         id: u.id,
         name: u.displayName || 'Unknown',
         age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
-        avatar: u.avatarUrl || 'https://i.pravatar.cc/150?u=' + u.id,
+        avatar: u.avatarUrl || `https://i.pravatar.cc/150?u=${u.id}`,
         bio: u.bio || '',
       },
     }));
 
     return res.json(result);
   } catch (e) {
-    next(e);
+    return next(e);
   }
 });
 
@@ -345,7 +369,6 @@ const PORT = Number(process.env.PORT) || 5000;
 const rooms = new Map(); // roomId -> Set<WebSocket>
 const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
 const lastSeenAt = new Map(); // userId -> ISO timestamp (letztes offline)
-let wssRef = null; // stored when server boots so HTTP routes can broadcast
 
 function addClientToRoom(roomId, ws) {
   let set = rooms.get(roomId);
@@ -369,8 +392,9 @@ function broadcastToRoom(roomId, payload) {
 
   const json = JSON.stringify(payload);
   for (const client of set) {
-    if (client.readyState !== client.OPEN) continue;
-    client.send(json);
+    if (client.readyState === client.OPEN) {
+      client.send(json);
+    }
   }
 }
 
@@ -380,9 +404,9 @@ function broadcastToRoomExcept(roomId, payload, exceptWs) {
 
   const json = JSON.stringify(payload);
   for (const client of set) {
-    if (client === exceptWs) continue;
-    if (client.readyState !== client.OPEN) continue;
-    client.send(json);
+    if (client !== exceptWs && client.readyState === client.OPEN) {
+      client.send(json);
+    }
   }
 }
 
@@ -399,18 +423,6 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
   }
 }
 
-// Send a message to a specific user via any open presence WS connection
-function sendToUser(userId, payload) {
-  if (!wssRef) return;
-  const id = String(userId);
-  const json = JSON.stringify(payload);
-  for (const client of wssRef.clients) {
-    if (client.readyState === client.OPEN && String(client.userId) === id) {
-      client.send(json);
-    }
-  }
-}
-
 // Serverstart + DB-Init + WebSocket
 (async () => {
   try {
@@ -423,7 +435,7 @@ function sendToUser(userId, payload) {
     wss.on('connection', async (ws, req) => {
       try {
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const pathname = url.pathname;
+        const { pathname } = url;
 
         // ----------------- CHAT (E2EE) -----------------
         if (pathname === '/ws/chat') {
@@ -434,7 +446,7 @@ function sendToUser(userId, payload) {
           }
 
           const cookies = cookie.parse(req.headers.cookie || '');
-          const at = cookies.at;
+          const { at } = cookies;
           if (!at) {
             ws.close(1008, 'No auth cookie');
             return;
@@ -447,7 +459,9 @@ function sendToUser(userId, payload) {
             return;
           }
 
+          // eslint-disable-next-line no-param-reassign
           ws.userId = user.id;
+          // eslint-disable-next-line no-param-reassign
           ws.roomId = roomId;
 
           addClientToRoom(roomId, ws);
@@ -535,7 +549,6 @@ function sendToUser(userId, payload) {
                   type: 'chat_message',
                   message: saved.toJSON(),
                 });
-                return;
               }
             } catch (err) {
               console.error('WS chat message error', err);
@@ -559,7 +572,7 @@ function sendToUser(userId, payload) {
           }
 
           const cookies = cookie.parse(req.headers.cookie || '');
-          const at = cookies.at;
+          const { at } = cookies;
           if (!at) {
             ws.close(1008, 'No auth cookie');
             return;
@@ -572,7 +585,9 @@ function sendToUser(userId, payload) {
             return;
           }
 
+          // eslint-disable-next-line no-param-reassign
           ws.userId = user.id;
+          // eslint-disable-next-line no-param-reassign
           ws.roomId = roomId;
 
           addClientToRoom(roomId, ws);
@@ -607,7 +622,6 @@ function sendToUser(userId, payload) {
                   startAt,
                   hostId: ws.userId,
                 });
-                return;
               }
             } catch (e) {
               console.error('WS spotify error', e);
@@ -626,7 +640,7 @@ function sendToUser(userId, payload) {
         // --------------- PRESENCE ---------------
         if (pathname === '/ws/presence') {
           const cookies = cookie.parse(req.headers.cookie || '');
-          const at = cookies.at;
+          const { at } = cookies;
           if (!at) {
             ws.close(1008, 'No auth cookie');
             return;
@@ -639,6 +653,7 @@ function sendToUser(userId, payload) {
             return;
           }
 
+          // eslint-disable-next-line no-param-reassign
           ws.userId = user.id;
 
           // online count erhöhen

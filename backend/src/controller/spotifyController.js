@@ -69,10 +69,10 @@ const normalizeBirthDate = (value) => {
   const date = new Date(Date.UTC(year, month - 1, day));
 
   if (
-    Number.isNaN(date.getTime()) ||
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
+    Number.isNaN(date.getTime())
+    || date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
   ) {
     return null;
   }
@@ -250,7 +250,6 @@ export const callback = async (req, res) => {
       avatarUrl: meProfile.images?.[0]?.url ?? null,
       country: meProfile.country ?? null,
       product: meProfile.product ?? null,
-<<<<<<< HEAD
       age: signupState.profile.age,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
@@ -259,8 +258,6 @@ export const callback = async (req, res) => {
       topTracks,
       recentlyPlayed,
       genres,
-=======
->>>>>>> 53f80857782363d717655499852d583e9e28e7a5
     };
 
     if (user) {
@@ -273,10 +270,11 @@ export const callback = async (req, res) => {
     }
 
     // Upsert auth tokens into spotify_tokens
+    const existingToken = await SpotifyToken.findByPk(user.id);
     await SpotifyToken.upsert({
       userId: user.id,
       accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token ?? (await SpotifyToken.findByPk(user.id))?.refreshToken ?? null,
+      refreshToken: tokens.refresh_token ?? existingToken?.refreshToken ?? null,
       tokenExpiresAt: expiresAt,
     });
 
@@ -321,8 +319,6 @@ export const me = async (req, res, next) => {
     const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
-    const spotifyData = await SpotifyData.findByPk(user.id);
-
     return res.json({
       id: user.id,
       spotifyId: user.spotifyId,
@@ -334,7 +330,6 @@ export const me = async (req, res, next) => {
       avatarUrl: user.avatarUrl,
       country: user.country,
       product: user.product,
-<<<<<<< HEAD
       age: user.age,
       bio: user.bio,
       isVisible: user.isVisible,
@@ -342,12 +337,6 @@ export const me = async (req, res, next) => {
       topTracks: user.topTracks,
       recentlyPlayed: user.recentlyPlayed,
       genres: user.genres,
-=======
-      topArtists: spotifyData?.topArtists ?? [],
-      topTracks: spotifyData?.topTracks ?? [],
-      recentlyPlayed: spotifyData?.recentlyPlayed ?? [],
-      genres: spotifyData?.genres ?? [],
->>>>>>> 53f80857782363d717655499852d583e9e28e7a5
     });
   } catch (e) {
     return next(e);
@@ -415,7 +404,7 @@ export const logout = async (_req, res, next) => {
 };
 
 // ======================= CURRENTLY PLAYING ===========
-export const currentlyPlaying = async (req, res, next) => {
+export const currentlyPlaying = async (req, res, _next) => {
   try {
     const { at } = req.cookies || {};
     if (!at) return res.status(401).json({ error: 'no_access_token' });

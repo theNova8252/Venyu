@@ -3,6 +3,7 @@
  * Other files should import models from here (or directly from their files).
  * Call setupAssociations() once before sequelize.sync().
  */
+/* eslint-disable import/no-cycle */
 import User from './User.js';
 import SpotifyToken from './SpotifyToken.js';
 import SpotifyData from './SpotifyData.js';

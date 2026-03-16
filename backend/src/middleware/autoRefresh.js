@@ -14,7 +14,7 @@ const COOKIE_OPTS_BASE = {
  * refresh-token cookie (`rt`) still exists, silently refresh the token
  * and set the new cookies before the request reaches route handlers.
  */
-export const autoRefreshToken = async (req, res, next) => {
+const autoRefreshToken = async (req, res, next) => {
   const { at, rt } = req.cookies || {};
 
   // Skip if access token is present or no refresh token available
@@ -49,5 +49,7 @@ export const autoRefreshToken = async (req, res, next) => {
     res.clearCookie('rt', { path: '/' });
   }
 
-  next();
+  return next();
 };
+
+export default autoRefreshToken;

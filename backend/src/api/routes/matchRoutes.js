@@ -78,9 +78,9 @@ router.get('/candidates', async (req, res, next) => {
     const otherIds = others.map((u) => u.id);
     const allRsvps = otherIds.length
       ? await EventRsvp.findAll({
-          where: { userId: { [Op.in]: otherIds }, interested: true },
-          attributes: ['userId', 'eventId', 'interested', 'going'],
-        })
+        where: { userId: { [Op.in]: otherIds }, interested: true },
+        attributes: ['userId', 'eventId', 'interested', 'going'],
+      })
       : [];
 
     // Group RSVPs by userId
@@ -111,15 +111,10 @@ router.get('/candidates', async (req, res, next) => {
     for (const sd of allSpotifyData) spotifyDataByUser[sd.userId] = sd;
 
     const result = others.map((u, index) => {
-<<<<<<< HEAD
       const displayName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.displayName;
+      const uSpotify = spotifyDataByUser[u.id];
       const artistNames = Array.isArray(u.topArtists)
         ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
-=======
-      const uSpotify = spotifyDataByUser[u.id];
-      const artistNames = Array.isArray(uSpotify?.topArtists)
-        ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
->>>>>>> 53f80857782363d717655499852d583e9e28e7a5
         : [];
 
       const artistIds = Array.isArray(uSpotify?.topArtists)
@@ -143,7 +138,8 @@ router.get('/candidates', async (req, res, next) => {
       const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
       const sharedEvents = userEventIds.filter((eid) => myEventIds.has(eid));
 
-      const totalScore = Math.round(genreScore * 50 + artistScore * 30 + (sharedEvents.length > 0 ? 20 : 0));
+      const eventBonus = sharedEvents.length > 0 ? 20 : 0;
+      const totalScore = Math.round(genreScore * 50 + artistScore * 30 + eventBonus);
 
       const candidate = {
         id: u.id,
@@ -156,12 +152,12 @@ router.get('/candidates', async (req, res, next) => {
         topArtists: artistNames,
         topTracks: Array.isArray(uSpotify?.topTracks)
           ? uSpotify.topTracks
-              .map((t) => ({
-                name: typeof t === 'string' ? t : t?.name,
-                artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',
-                albumImage: typeof t === 'string' ? null : t?.album?.image || null,
-              }))
-              .filter((t) => t.name)
+            .map((t) => ({
+              name: typeof t === 'string' ? t : t?.name,
+              artist: typeof t === 'string' ? '' : t?.artists?.[0]?.name || '',
+              albumImage: typeof t === 'string' ? null : t?.album?.image || null,
+            }))
+            .filter((t) => t.name)
           : [],
         genres: uGenres,
         eventRsvps: rsvpsByUser[u.id] || [],

@@ -28,26 +28,6 @@ function makeSequelize() {
 
 export const sequelize = makeSequelize();
 
-export async function initDb() {
-  // Import all models so Sequelize knows about them, then wire associations
-  const { setupAssociations } = await import('./index.js');
-  setupAssociations();
-
-  try {
-    await sequelize.authenticate();
-
-    // Pre-migration: convert existing VARCHAR columns to UUID where needed
-    // This handles the transition from the old schema to the new one
-    await runPreMigration();
-
-    await sequelize.sync({ alter: true });
-    console.log('DB connected & synced');
-  } catch (err) {
-    console.error('DB connection failed:', err.message);
-    process.exit(1);
-  }
-}
-
 async function runPreMigration() {
   const qi = sequelize.getQueryInterface();
 
@@ -102,12 +82,11 @@ async function runPreMigration() {
   if (await tableExists('users')) {
     const oldCols = ['access_token', 'refresh_token', 'token_expires_at', 'top_artists', 'top_tracks', 'recently_played', 'genres'];
     const desc = await qi.describeTable('users').catch(() => ({}));
-    for (const col of oldCols) {
-      if (desc[col]) {
-        console.log(`Dropping old users.${col} column...`);
-        await qi.removeColumn('users', col).catch(() => {});
-      }
-    }
+    const colsToDrop = oldCols.filter((col) => desc[col]);
+    await Promise.all(colsToDrop.map((col) => {
+      console.log(`Dropping old users.${col} column...`);
+      return qi.removeColumn('users', col).catch(() => {});
+    }));
   }
 
   // --- event_rsvps: ensure proper column names ---
@@ -115,18 +94,18 @@ async function runPreMigration() {
     const desc = await qi.describeTable('event_rsvps').catch(() => ({}));
 
     // Rename camelCase → snake_case if old columns exist
-    if (desc['userId'] && !desc['user_id']) {
+    if (desc.userId && !desc.user_id) {
       console.log('Renaming event_rsvps.userId → user_id...');
       await sequelize.query('ALTER TABLE event_rsvps RENAME COLUMN "userId" TO user_id').catch(() => {});
     }
-    if (desc['eventId'] && !desc['event_id']) {
+    if (desc.eventId && !desc.event_id) {
       console.log('Renaming event_rsvps.eventId → event_id...');
       await sequelize.query('ALTER TABLE event_rsvps RENAME COLUMN "eventId" TO event_id').catch(() => {});
     }
 
     // If required columns are completely missing, the existing rows are orphaned — truncate
     const descAfter = await qi.describeTable('event_rsvps').catch(() => ({}));
-    if (!descAfter['user_id'] && !descAfter['userId']) {
+    if (!descAfter.user_id && !descAfter.userId) {
       console.log('event_rsvps missing user column — truncating orphan rows...');
       await sequelize.query('TRUNCATE TABLE event_rsvps RESTART IDENTITY CASCADE').catch(() => {});
     } else {
@@ -134,5 +113,26 @@ async function runPreMigration() {
       await sequelize.query('DELETE FROM event_rsvps WHERE user_id IS NULL OR event_id IS NULL').catch(() => {});
       await sequelize.query('DELETE FROM event_rsvps WHERE user_id NOT IN (SELECT id FROM users)').catch(() => {});
     }
+  }
+}
+
+export async function initDb() {
+  // Import all models so Sequelize knows about them, then wire associations
+  // eslint-disable-next-line import/no-cycle
+  const { setupAssociations } = await import('./index.js');
+  setupAssociations();
+
+  try {
+    await sequelize.authenticate();
+
+    // Pre-migration: convert existing VARCHAR columns to UUID where needed
+    // This handles the transition from the old schema to the new one
+    await runPreMigration();
+
+    await sequelize.sync({ alter: true });
+    console.log('DB connected & synced');
+  } catch (err) {
+    console.error('DB connection failed:', err.message);
+    process.exit(1);
   }
 }
