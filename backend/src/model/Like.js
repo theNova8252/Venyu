@@ -15,11 +15,17 @@ Like.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: 'from_user_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     toUserId: {
       type: DataTypes.UUID,
       allowNull: false,
       field: 'to_user_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
   },
   {

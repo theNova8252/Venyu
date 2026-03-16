@@ -10,6 +10,9 @@ SpotifyToken.init(
       type: DataTypes.UUID,
       primaryKey: true,
       field: 'user_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     accessToken: {
       type: DataTypes.TEXT,

@@ -90,13 +90,13 @@ router.get('/candidates', async (req, res, next) => {
       rsvpsByUser[r.userId].push({ eventId: r.eventId, interested: r.interested, going: r.going });
     }
 
-    // Get me's data for match-score breakdown
+    // Get me's data for match-score breakdown (cap at top 5 genres and artists)
     const mySpotifyData = await SpotifyData.findByPk(me.id);
-    const meGenres = new Set(Array.isArray(mySpotifyData?.genres) ? mySpotifyData.genres : []);
+    const meGenres = new Set(Array.isArray(mySpotifyData?.genres) ? mySpotifyData.genres.slice(0, 6) : []);
     const meArtistIds = new Set(
-      (Array.isArray(mySpotifyData?.topArtists) ? mySpotifyData.topArtists : []).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean),
+      (Array.isArray(mySpotifyData?.topArtists) ? mySpotifyData.topArtists.slice(0, 4) : []).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean),
     );
-    // My event RSVPs
+    // My event RSVPs (kept for display only, not used in score)
     const myRsvps = await EventRsvp.findAll({
       where: { userId: me.id, interested: true },
       attributes: ['eventId'],
@@ -113,33 +113,32 @@ router.get('/candidates', async (req, res, next) => {
     const result = others.map((u, index) => {
       const displayName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.displayName;
       const uSpotify = spotifyDataByUser[u.id];
-      const artistNames = Array.isArray(u.topArtists)
-        ? u.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
+      const artistNames = Array.isArray(uSpotify?.topArtists)
+        ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.name)).filter(Boolean)
         : [];
 
+      // Cap at top 4 artists for matching
       const artistIds = Array.isArray(uSpotify?.topArtists)
-        ? uSpotify.topArtists.map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
+        ? uSpotify.topArtists.slice(0, 4).map((a) => (typeof a === 'string' ? a : a?.id || a?.name)).filter(Boolean)
         : [];
 
-      const uGenres = Array.isArray(uSpotify?.genres) ? uSpotify.genres : [];
+      // Cap at top 6 genres for matching
+      const uGenres = Array.isArray(uSpotify?.genres) ? uSpotify.genres.slice(0, 6) : [];
 
-      // Match score breakdown
+      // Match score: 6 genres + 4 artists = 10 total, scaled to 100
       const uGenreSet = new Set(uGenres);
       const sharedGenres = [...meGenres].filter((g) => uGenreSet.has(g));
-      const genreUnion = new Set([...meGenres, ...uGenreSet]);
-      const genreScore = genreUnion.size === 0 ? 0 : sharedGenres.length / genreUnion.size;
 
       const uArtistSet = new Set(artistIds);
       const sharedArtists = [...meArtistIds].filter((a) => uArtistSet.has(a));
-      const artistMax = Math.max(meArtistIds.size, uArtistSet.size);
-      const artistScore = artistMax === 0 ? 0 : sharedArtists.length / artistMax;
 
-      // Event overlap
+      // Event overlap (display only, not counted in score)
       const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
       const sharedEvents = userEventIds.filter((eid) => myEventIds.has(eid));
 
-      const eventBonus = sharedEvents.length > 0 ? 20 : 0;
-      const totalScore = Math.round(genreScore * 50 + artistScore * 30 + eventBonus);
+      // Each shared item = 10% (6 genres + 4 artists = 10 items = 100%)
+      const totalScore = Math.min(100, (sharedGenres.length + sharedArtists.length) * 10);
+      console.log(`🎯 ${displayName}: ${sharedGenres.length} shared genres, ${sharedArtists.length} shared artists → ${totalScore}%`);
 
       const candidate = {
         id: u.id,
@@ -149,7 +148,11 @@ router.get('/candidates', async (req, res, next) => {
         avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
         bio: u.bio || 'Music lover',
         distance: 'Nearby',
-        topArtists: artistNames,
+        topArtists: Array.isArray(uSpotify?.topArtists)
+          ? uSpotify.topArtists
+            .map((a) => (typeof a === 'string' ? { name: a, image: null } : { name: a?.name, image: a?.image || null }))
+            .filter((a) => a.name)
+          : [],
         topTracks: Array.isArray(uSpotify?.topTracks)
           ? uSpotify.topTracks
             .map((t) => ({
@@ -161,15 +164,15 @@ router.get('/candidates', async (req, res, next) => {
           : [],
         genres: uGenres,
         eventRsvps: rsvpsByUser[u.id] || [],
-        matchScore: totalScore || 80,
+        matchScore: totalScore,
         matchBreakdown: {
-          genreScore: Math.round(genreScore * 50),
+          genreScore: sharedGenres.length,
+          genreMax: 6,
           sharedGenres,
-          artistScore: Math.round(artistScore * 30),
+          artistScore: sharedArtists.length,
+          artistMax: 4,
           sharedArtists: sharedArtists.length,
-          eventScore: sharedEvents.length > 0 ? 20 : 0,
-          sharedEvents: sharedEvents.length,
-          total: totalScore || 80,
+          total: totalScore,
         },
       };
       return candidate;

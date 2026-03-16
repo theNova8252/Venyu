@@ -124,6 +124,20 @@ export const useAuthStore = defineStore('auth', {
       window.location.href = `/api/spotify/auth/login?state=${encodeURIComponent(state)}`;
     },
 
+    async loginExisting(returnTo = '/home') {
+      const target =
+        typeof returnTo === 'string' && /^https?:\/\//.test(returnTo)
+          ? returnTo
+          : `${window.location.origin}${returnTo}`;
+
+      const state = encodeAuthState({
+        returnTo: target,
+        loginOnly: true,
+      });
+
+      window.location.href = `/api/spotify/auth/login?state=${encodeURIComponent(state)}`;
+    },
+
     async handleAuthCallback() {
       // Fetch user data after OAuth callback
       await this.fetchMe();

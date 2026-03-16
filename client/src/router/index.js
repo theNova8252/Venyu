@@ -66,6 +66,11 @@ router.beforeEach(async (to, from, next) => {
     await auth.fetchMe();
   }
 
+  // Redirect authenticated users away from the landing page to home
+  if ((to.path === '/' || to.path === '/landing') && auth.isAuthenticated) {
+    return next('/home');
+  }
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/');
   } else {

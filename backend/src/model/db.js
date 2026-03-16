@@ -78,13 +78,16 @@ async function runPreMigration() {
     }
   }
 
-  // --- Drop old columns from users table that moved to new tables ---
+  // --- Drop stale columns from users table that moved to dedicated tables ---
   if (await tableExists('users')) {
-    const oldCols = ['access_token', 'refresh_token', 'token_expires_at', 'top_artists', 'top_tracks', 'recently_played', 'genres'];
+    const oldCols = [
+      'access_token', 'refresh_token', 'token_expires_at',
+      'top_artists', 'top_tracks', 'recently_played', 'genres',
+    ];
     const desc = await qi.describeTable('users').catch(() => ({}));
     const colsToDrop = oldCols.filter((col) => desc[col]);
     await Promise.all(colsToDrop.map((col) => {
-      console.log(`Dropping old users.${col} column...`);
+      console.log(`Dropping stale users.${col} column...`);
       return qi.removeColumn('users', col).catch(() => {});
     }));
   }
@@ -112,6 +115,13 @@ async function runPreMigration() {
       // Clean orphan rows
       await sequelize.query('DELETE FROM event_rsvps WHERE user_id IS NULL OR event_id IS NULL').catch(() => {});
       await sequelize.query('DELETE FROM event_rsvps WHERE user_id NOT IN (SELECT id FROM users)').catch(() => {});
+    }
+
+    // --- Migrate INTEGER pk → UUID pk (drop & recreate, RSVP data is soft state) ---
+    const idDesc = descAfter.id;
+    if (idDesc && (idDesc.type === 'INTEGER' || idDesc.type.toUpperCase().includes('INT'))) {
+      console.log('Migrating event_rsvps.id INTEGER → UUID: dropping table for recreation...');
+      await qi.dropTable('event_rsvps').catch(() => {});
     }
   }
 }

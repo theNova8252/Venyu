@@ -11,6 +11,9 @@ E2eeKey.init(
       allowNull: false,
       primaryKey: true,
       field: 'user_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     publicKeyJwk: {
       type: DataTypes.JSONB,

@@ -105,6 +105,7 @@ const getSignupDataFromState = (state) => {
 
   return {
     returnTo: typeof parsed.returnTo === 'string' && parsed.returnTo ? parsed.returnTo : null,
+    loginOnly: parsed.loginOnly === true,
     profile: {
       firstName: normalizeName(rawProfile.firstName),
       lastName: normalizeName(rawProfile.lastName),
@@ -146,17 +147,19 @@ const redirectToLandingError = (res, returnTo, error) => {
 export const login = (req, res) => {
   const state = typeof req.query.state === 'string' ? req.query.state : '';
   const signupState = getSignupDataFromState(state);
-  const { profile } = signupState;
+  const { profile, loginOnly } = signupState;
 
-  if (!hasRequiredSignupProfile(profile)) {
-    return res.status(400).json({
-      error: 'missing_signup_profile',
-      message: 'firstName and birthDate are required before Spotify login',
-    });
-  }
+  if (!loginOnly) {
+    if (!hasRequiredSignupProfile(profile)) {
+      return res.status(400).json({
+        error: 'missing_signup_profile',
+        message: 'firstName and birthDate are required before Spotify login',
+      });
+    }
 
-  if (!isAllowedAge(profile)) {
-    return redirectToLandingError(res, signupState.returnTo, 'underage');
+    if (!isAllowedAge(profile)) {
+      return redirectToLandingError(res, signupState.returnTo, 'underage');
+    }
   }
 
   return res.redirect(buildAuthUrl(state));
@@ -169,12 +172,15 @@ export const callback = async (req, res) => {
     if (!code) return res.status(400).send('Missing code');
 
     const signupState = getSignupDataFromState(state);
-    if (!hasRequiredSignupProfile(signupState.profile)) {
-      return res.status(400).send('missing_signup_profile');
-    }
 
-    if (!isAllowedAge(signupState.profile)) {
-      return redirectToLandingError(res, signupState.returnTo, 'underage');
+    if (!signupState.loginOnly) {
+      if (!hasRequiredSignupProfile(signupState.profile)) {
+        return res.status(400).send('missing_signup_profile');
+      }
+
+      if (!isAllowedAge(signupState.profile)) {
+        return redirectToLandingError(res, signupState.returnTo, 'underage');
+      }
     }
 
     const tokens = await exchangeCodeForTokens(code);
@@ -241,16 +247,22 @@ export const callback = async (req, res) => {
 
     let user = await User.findOne({ where: { spotifyId: meProfile.id } });
 
+    if (signupState.loginOnly && !user) {
+      return redirectToLandingError(res, signupState.returnTo, 'no_account');
+    }
+
     const userPayload = {
-      displayName: buildDisplayName(signupState.profile, meProfile.display_name ?? null),
-      firstName: signupState.profile.firstName,
-      lastName: signupState.profile.lastName,
-      birthDate: signupState.profile.birthDate,
+      displayName: signupState.loginOnly
+        ? (user?.displayName || meProfile.display_name || null)
+        : buildDisplayName(signupState.profile, meProfile.display_name ?? null),
+      firstName: signupState.loginOnly ? (user?.firstName ?? null) : signupState.profile.firstName,
+      lastName: signupState.loginOnly ? (user?.lastName ?? null) : signupState.profile.lastName,
+      birthDate: signupState.loginOnly ? (user?.birthDate ?? null) : signupState.profile.birthDate,
       email: meProfile.email ?? null,
       avatarUrl: meProfile.images?.[0]?.url ?? null,
       country: meProfile.country ?? null,
       product: meProfile.product ?? null,
-      age: signupState.profile.age,
+      age: signupState.loginOnly ? (user?.age ?? null) : signupState.profile.age,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token ?? (user ? user.refreshToken : null),
       tokenExpiresAt: expiresAt,

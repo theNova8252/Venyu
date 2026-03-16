@@ -20,6 +20,9 @@ ChatMessage.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: 'sender_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     ciphertext: {
       type: DataTypes.TEXT,
@@ -53,7 +56,7 @@ ChatMessage.init(
     indexes: [
       { fields: ['room_id'] },
       { fields: ['sender_id'] },
-      { fields: ['createdAt'] },
+      { fields: ['created_at'] },
       { fields: ['read_at'] },
     ],
   },

@@ -102,6 +102,50 @@ function getArtistId(artist) {
   return null;
 }
 
+// ── Genre normalizer: map Spotify micro-genres to basic parent genres ──
+const GENRE_MAP = [
+  { parent: 'Pop', keywords: ['pop'] },
+  { parent: 'Hip Hop', keywords: ['hip hop', 'rap', 'trap', 'drill'] },
+  { parent: 'R&B', keywords: ['r&b', 'rnb', 'rhythm and blues', 'neo soul', 'urban contemporary'] },
+  { parent: 'EDM', keywords: ['edm', 'electronic', 'house', 'techno', 'trance', 'dubstep', 'drum and bass', 'dnb', 'electro', 'hardstyle', 'bass music'] },
+  { parent: 'Rock', keywords: ['rock', 'grunge', 'alternative', 'garage'] },
+  { parent: 'Metal', keywords: ['metal', 'metalcore', 'deathcore', 'hardcore'] },
+  { parent: 'Indie', keywords: ['indie'] },
+  { parent: 'Jazz', keywords: ['jazz', 'bebop', 'swing'] },
+  { parent: 'Classical', keywords: ['classical', 'orchestra', 'symphony', 'opera', 'baroque', 'chamber'] },
+  { parent: 'Country', keywords: ['country', 'bluegrass', 'americana'] },
+  { parent: 'Latin', keywords: ['latin', 'reggaeton', 'salsa', 'bachata', 'cumbia', 'dembow', 'banda', 'corrido', 'norteno', 'mariachi'] },
+  { parent: 'Soul', keywords: ['soul', 'motown'] },
+  { parent: 'Funk', keywords: ['funk', 'boogie'] },
+  { parent: 'Reggae', keywords: ['reggae', 'dancehall', 'dub', 'ska'] },
+  { parent: 'Blues', keywords: ['blues'] },
+  { parent: 'Folk', keywords: ['folk', 'singer-songwriter'] },
+  { parent: 'Punk', keywords: ['punk', 'emo', 'screamo'] },
+  { parent: 'K-Pop', keywords: ['k-pop', 'kpop'] },
+  { parent: 'Afrobeats', keywords: ['afrobeat', 'afropop', 'afro'] },
+];
+
+function normalizeGenre(raw) {
+  const lower = raw.toLowerCase();
+  for (const { parent, keywords } of GENRE_MAP) {
+    if (keywords.some((kw) => lower.includes(kw))) return parent;
+  }
+  return null; // drop unrecognizable micro-genres
+}
+
+function normalizeGenres(genreList) {
+  const seen = new Set();
+  const result = [];
+  for (const raw of genreList) {
+    const normalized = normalizeGenre(String(raw));
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  }
+  return result;
+}
+
 // stored when server boots so HTTP routes can broadcast
 let wssRef = null;
 
@@ -132,16 +176,15 @@ app.get('/api/matches/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
 
-    // My music data from spotify_data table
+    // My music data from spotify_data table (cap at top 6 genres, top 4 artists)
     const mySpotifyData = await SpotifyData.findByPk(me.id);
-    const myTopArtists = toArray(mySpotifyData?.topArtists);
+    const myTopArtists = toArray(mySpotifyData?.topArtists).slice(0, 4);
     const myArtistIds = new Set(myTopArtists.map(getArtistId).filter(Boolean));
     const myArtistNames = new Set(
       myTopArtists.map(getArtistName).filter(Boolean).map((n) => n.toLowerCase()),
     );
-    const myGenres = new Set(
-      toArray(mySpotifyData?.genres).map((genre) => String(genre).toLowerCase()),
-    );
+    const myGenresNormalized = normalizeGenres(toArray(mySpotifyData?.genres));
+    const myGenres = new Set(myGenresNormalized.slice(0, 6).map((g) => g.toLowerCase()));
 
     // Filter out already liked users
     const myLikes = await Like.findAll({
@@ -194,40 +237,34 @@ app.get('/api/matches/candidates', async (req, res, next) => {
     const result = others.map((u, index) => {
       const uSpotify = spotifyDataByUser[u.id];
       const candidateTopArtists = toArray(uSpotify?.topArtists);
-      const candidateGenres = toArray(uSpotify?.genres).map((genre) => String(genre));
-      const topArtists = candidateTopArtists.map(getArtistName).filter(Boolean);
+      const candidateGenresRaw = toArray(uSpotify?.genres).map((genre) => String(genre));
+      const candidateGenres = normalizeGenres(candidateGenresRaw);
 
-      // --- Genre matching (Jaccard similarity) ---
-      const uGenreSet = new Set(candidateGenres.map((g) => g.toLowerCase()));
-      const sharedGenresList = [...myGenres].filter((g) => uGenreSet.has(g));
-      const genreUnion = new Set([...myGenres, ...uGenreSet]);
-      const genreRatio = genreUnion.size === 0 ? 0 : sharedGenresList.length / genreUnion.size;
-      const genreScore = Math.round(genreRatio * 50);
+      // Cap at top 6 genres and top 4 artists for matching
+      const myGenresCapped = [...myGenres].slice(0, 6);
+      const uGenresCapped = candidateGenres.slice(0, 6).map((g) => g.toLowerCase());
+      const uGenreSet = new Set(uGenresCapped);
+      const sharedGenresList = myGenresCapped.filter((g) => uGenreSet.has(g));
 
-      // --- Artist matching ---
-      const uArtistIds = new Set(candidateTopArtists.map(getArtistId).filter(Boolean));
+      // Artist matching by id OR name (top 4)
+      const uArtistsCapped = candidateTopArtists.slice(0, 4);
+      const uArtistIds = new Set(uArtistsCapped.map(getArtistId).filter(Boolean));
       const uArtistNames = new Set(
-        candidateTopArtists.map(getArtistName).filter(Boolean).map((n) => n.toLowerCase()),
+        uArtistsCapped.map(getArtistName).filter(Boolean).map((n) => n.toLowerCase()),
       );
-      // Match by id OR name
-      const sharedById = [...myArtistIds].filter((id) => uArtistIds.has(id)).length;
-      const sharedByName = [...myArtistNames].filter((n) => uArtistNames.has(n)).length;
+      const myArtistNamesCapped = [...myArtistNames].slice(0, 4);
+      const myArtistIdsCapped = [...myArtistIds].slice(0, 4);
+      const sharedById = myArtistIdsCapped.filter((id) => uArtistIds.has(id)).length;
+      const sharedByName = myArtistNamesCapped.filter((n) => uArtistNames.has(n)).length;
       const sharedArtistCount = Math.max(sharedById, sharedByName);
-      const artistMax = Math.max(
-        myArtistIds.size || myArtistNames.size,
-        uArtistIds.size || uArtistNames.size,
-      );
-      const artistRatio = artistMax === 0 ? 0 : sharedArtistCount / artistMax;
-      const artistScore = Math.round(artistRatio * 30);
 
-      // --- Event overlap ---
+      // Each shared item = 10% (6 genres + 4 artists = 10 items = 100%)
+      const totalScore = Math.min(100, (sharedGenresList.length + sharedArtistCount) * 10);
+      console.log(`🎯 ${u.displayName}: ${sharedGenresList.length} shared genres, ${sharedArtistCount} shared artists → ${totalScore}%`);
+
+      // Event overlap (display only, not in score)
       const userEventIds = (rsvpsByUser[u.id] || []).map((r) => r.eventId);
       const sharedEventsList = userEventIds.filter((eid) => myEventIds.has(eid));
-      const eventScore = sharedEventsList.length > 0
-        ? Math.min(20, sharedEventsList.length * 10)
-        : 0;
-
-      const totalScore = genreScore + artistScore + eventScore;
 
       return {
         id: u.id,
@@ -235,9 +272,11 @@ app.get('/api/matches/candidates', async (req, res, next) => {
         name: u.displayName || 'Unknown',
         age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
         avatar: u.avatarUrl || `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
-        bio: u.bio || 'Music lover 🎵',
+        bio: u.bio || 'Music lover',
         distance: 'Nearby',
-        topArtists,
+        topArtists: candidateTopArtists
+          .map((a) => (typeof a === 'string' ? { name: a, image: null } : { name: a?.name, image: a?.image || null }))
+          .filter((a) => a.name),
         topTracks: toArray(uSpotify?.topTracks)
           .map((t) => ({
             name: typeof t === 'string' ? t : t?.name,
@@ -245,16 +284,25 @@ app.get('/api/matches/candidates', async (req, res, next) => {
             albumImage: typeof t === 'string' ? null : t?.album?.image || null,
           }))
           .filter((t) => t.name),
+        recentlyPlayed: toArray(uSpotify?.recentlyPlayed)
+          .slice(0, 5)
+          .map((item) => ({
+            name: item?.track?.name || (typeof item === 'string' ? item : null),
+            artist: item?.track?.artists?.[0]?.name || '',
+            albumImage: item?.track?.album?.image || null,
+            playedAt: item?.playedAt || null,
+          }))
+          .filter((t) => t.name),
         genres: candidateGenres,
         eventRsvps: rsvpsByUser[u.id] || [],
         matchScore: totalScore,
         matchBreakdown: {
-          genreScore,
+          genreScore: sharedGenresList.length,
+          genreMax: 6,
           sharedGenres: sharedGenresList,
-          artistScore,
+          artistScore: sharedArtistCount,
+          artistMax: 4,
           sharedArtists: sharedArtistCount,
-          eventScore,
-          sharedEvents: sharedEventsList.length,
           total: totalScore,
         },
       };

@@ -25,6 +25,11 @@
           </a>
         </div>
 
+        <q-btn unelevated class="login-btn-nav gt-sm" @click="onLoginExisting">
+          <img src="/src/assets/spotify-logo.png" alt="" class="btn-icon" style="width:16px;height:16px;margin-right:6px" />
+          <span class="cta-text">login</span>
+        </q-btn>
+
         <q-btn unelevated class="cta-btn-nav" @click="onSpotifyConnect">
           <span class="cta-text">let's go</span>
           <q-icon name="arrow_forward" size="18px" class="cta-arrow" />
@@ -62,6 +67,10 @@
             <img src="/src/assets/spotify-logo.png" alt="" class="btn-icon" style="width:20px;height:20px;margin-right:8px" />
             <span>connect with spotify</span>
           </q-btn>
+          <q-btn flat class="mobile-login-btn" @click="onLoginExisting">
+            <img src="/src/assets/spotify-logo.png" alt="" class="btn-icon" style="width:18px;height:18px;margin-right:8px;opacity:0.8" />
+            <span>already have an account? login</span>
+          </q-btn>
         </div>
       </div>
     </transition>
@@ -95,6 +104,10 @@
             <img src="/src/assets/spotify-logo.png" alt="" class="btn-icon" />
             <span>connect spotify</span>
             <div class="btn-shimmer"></div>
+          </q-btn>
+          <q-btn flat class="hero-login-btn" @click="onLoginExisting">
+            <img src="/src/assets/spotify-logo.png" alt="" class="btn-icon" style="width:18px;height:18px;margin-right:8px;opacity:0.8" />
+            <span>already have an account? login</span>
           </q-btn>
         </div>
       </div>
@@ -463,6 +476,11 @@ const onSpotifyConnect = () => {
   spotifySignupOpen.value = true
 }
 
+const onLoginExisting = () => {
+  closeMobileMenu()
+  auth.loginExisting('/home')
+}
+
 const handleSpotifySignup = async (profile) => {
   if (calculateAgeFromBirthDate(profile.birthDate) < 16) {
     spotifySignupOpen.value = false
@@ -504,14 +522,23 @@ watch(mobileMenuOpen, (open) => {
 watch(
   () => route.query.error,
   async (error) => {
-    if (error !== 'underage') return
-
-    $q.notify({
-      color: 'negative',
-      message: 'You must be 16+ to use Venyu.',
-      position: 'top',
-      timeout: 2500,
-    })
+    if (error === 'underage') {
+      $q.notify({
+        color: 'negative',
+        message: 'You must be 16+ to use Venyu.',
+        position: 'top',
+        timeout: 2500,
+      })
+    } else if (error === 'no_account') {
+      $q.notify({
+        color: 'negative',
+        message: 'No account found. Sign up first to join Venyu.',
+        position: 'top',
+        timeout: 3000,
+      })
+    } else {
+      return
+    }
 
     const query = { ...route.query }
     delete query.error
@@ -994,6 +1021,33 @@ onUnmounted(() => {
   }
 }
 
+.login-btn-nav {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  border-radius: 100px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  transition: all 0.25s ease;
+  margin-right: 4px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: white;
+  }
+
+  .cta-text {
+    position: relative;
+    z-index: 1;
+  }
+}
+
 .btn-glow {
   display: none;
 }
@@ -1131,6 +1185,29 @@ onUnmounted(() => {
   }
 }
 
+.mobile-login-btn {
+  width: 100%;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-top: 8px;
+  transition: all 0.25s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+  }
+}
+
 /* Hero Section */
 .hero-section {
   min-height: 100vh;
@@ -1256,6 +1333,22 @@ onUnmounted(() => {
   span {
     position: relative;
     z-index: 1;
+  }
+}
+
+.hero-login-btn {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+  padding: 8px 16px;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.9);
   }
 }
 

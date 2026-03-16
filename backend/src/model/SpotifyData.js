@@ -10,21 +10,28 @@ SpotifyData.init(
       type: DataTypes.UUID,
       primaryKey: true,
       field: 'user_id',
+      references: { model: 'users', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE',
     },
     topArtists: {
       type: DataTypes.JSONB,
+      defaultValue: [],
       field: 'top_artists',
     },
     topTracks: {
       type: DataTypes.JSONB,
+      defaultValue: [],
       field: 'top_tracks',
     },
     recentlyPlayed: {
       type: DataTypes.JSONB,
+      defaultValue: [],
       field: 'recently_played',
     },
     genres: {
       type: DataTypes.ARRAY(DataTypes.STRING),
+      defaultValue: [],
       field: 'genres',
     },
   },
