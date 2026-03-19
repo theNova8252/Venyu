@@ -10,6 +10,11 @@ import ProfileView from '@/views/ProfileView.vue';
 import AuthCallback from '@/views/AuthCallback.vue';
 import { useAuthStore } from '@/stores/auth.js';
 import ChatView from '@/views/ChatView.vue';
+import MatchesView from '@/views/MatchesView.vue';
+import MusicView from '@/views/MusicView.vue';
+import NotificationsView from '@/views/NotificationsView.vue';
+import FavoritesView from '@/views/FavoritesView.vue';
+import SettingsView from '@/views/SettingsView.vue';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -55,6 +60,36 @@ const router = createRouter({
     {
       path: '/auth/callback',
       component: AuthCallback,
+    },
+    {
+      path: '/matches',
+      name: 'Matches',
+      component: MatchesView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/music',
+      name: 'Music',
+      component: MusicView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/notifications',
+      name: 'Notifications',
+      component: NotificationsView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/favorites',
+      name: 'Favorites',
+      component: FavoritesView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/settings',
+      name: 'Settings',
+      component: SettingsView,
+      meta: { requiresAuth: true },
     },
   ],
 });

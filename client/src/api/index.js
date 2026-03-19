@@ -66,6 +66,11 @@ export const api = {
     });
   },
 
+  // Search
+  async search(query, type = 'all') {
+    return baseFetch(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+  },
+
   // Chat
   async getChatRooms() {
     return baseFetch('/api/chat/rooms');

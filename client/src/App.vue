@@ -13,14 +13,14 @@
           </router-link>
         </div>
 
-        <!-- Center: search -->
-        <div class="toolbar-center gt-sm">
-          <q-input dark dense standout v-model="searchQuery" placeholder="Search artists, venues..."
-            class="search-bar">
-            <template v-slot:prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+        <!-- Center: search trigger -->
+        <div class="toolbar-center">
+          <div class="search-trigger gt-sm" @click="showSearch = true">
+            <q-icon name="search" size="16px" />
+            <span class="search-trigger-text">Search...</span>
+            <kbd class="search-trigger-kbd">{{ isMac ? '\u2318' : 'Ctrl' }}+K</kbd>
+          </div>
+          <q-btn flat round dense icon="search" class="lt-md search-mobile-btn" @click="showSearch = true" />
         </div>
 
         <!-- Right: now-playing + actions -->
@@ -37,11 +37,6 @@
               <span></span><span></span><span></span>
             </div>
           </div>
-
-          <!-- Notifications -->
-          <q-btn flat round dense icon="notifications_none" class="header-icon-btn">
-            <q-badge color="deep-purple-6" floating rounded>3</q-badge>
-          </q-btn>
 
           <!-- Profile Menu -->
           <q-btn flat round dense class="profile-avatar-btn">
@@ -94,7 +89,7 @@
           <!-- User Profile Section -->
           <div class="user-profile-section">
             <div class="profile-bg-glow"></div>
-            <q-avatar size="64px" class="profile-avatar">
+            <q-avatar size="56px" class="profile-avatar">
               <img :src="userAvatar" />
             </q-avatar>
             <div class="profile-name">{{ userName }}</div>
@@ -103,7 +98,11 @@
 
           <!-- Navigation -->
           <q-list class="nav-list">
-            <div class="nav-section-label">Main</div>
+            <!-- SOCIAL -->
+            <div class="nav-section-label">
+              <span>Social</span>
+              <div class="nav-section-line"></div>
+            </div>
 
             <q-item clickable v-ripple :to="{ name: 'Home' }" exact class="nav-item">
               <q-item-section avatar>
@@ -116,35 +115,48 @@
 
             <q-item clickable v-ripple :to="{ name: 'SwipeCard' }" class="nav-item">
               <q-item-section avatar>
-                <q-icon name="explore" />
+                <q-icon name="local_fire_department" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="nav-label">Discover</q-item-label>
+                <q-item-label class="nav-label">Swipe</q-item-label>
               </q-item-section>
             </q-item>
 
             <q-item clickable v-ripple to="/chats" class="nav-item">
               <q-item-section avatar>
-                <q-icon name="chat" />
+                <q-icon name="chat_bubble_outline" />
               </q-item-section>
               <q-item-section>
                 <q-item-label class="nav-label">Chats</q-item-label>
               </q-item-section>
               <q-item-section side v-if="unreadMessages > 0">
-                <q-badge color="deep-purple-6" rounded>{{ unreadMessages }}</q-badge>
+                <q-badge class="nav-badge-pill" rounded>{{ unreadMessages }}</q-badge>
               </q-item-section>
             </q-item>
 
-            <q-item clickable v-ripple :to="{ name: 'ProfileView' }" class="nav-item">
+            <q-item clickable v-ripple :to="{ name: 'Matches' }" class="nav-item">
               <q-item-section avatar>
-                <q-icon name="account_circle" />
+                <q-icon name="favorite_border" />
               </q-item-section>
               <q-item-section>
-                <q-item-label class="nav-label">Profile</q-item-label>
+                <q-item-label class="nav-label">Matches</q-item-label>
               </q-item-section>
             </q-item>
 
-            <div class="nav-section-label" style="margin-top: 16px">Explore</div>
+            <!-- DISCOVER -->
+            <div class="nav-section-label">
+              <span>Discover</span>
+              <div class="nav-section-line"></div>
+            </div>
+
+            <q-item clickable v-ripple :to="{ name: 'Music' }" class="nav-item">
+              <q-item-section avatar>
+                <q-icon name="library_music" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="nav-label">Music</q-item-label>
+              </q-item-section>
+            </q-item>
 
             <q-item clickable v-ripple :to="{ name: 'EventMap' }" class="nav-item">
               <q-item-section avatar>
@@ -155,16 +167,40 @@
               </q-item-section>
             </q-item>
 
-            <q-item clickable v-ripple class="nav-item">
+            <q-item clickable v-ripple :to="{ name: 'Favorites' }" class="nav-item">
               <q-item-section avatar>
-                <q-icon name="favorite" />
+                <q-icon name="star_outline" />
               </q-item-section>
               <q-item-section>
                 <q-item-label class="nav-label">Favorites</q-item-label>
               </q-item-section>
             </q-item>
 
-            <q-item clickable v-ripple class="nav-item">
+            <q-item clickable v-ripple :to="{ name: 'Notifications' }" class="nav-item">
+              <q-item-section avatar>
+                <q-icon name="notifications_none" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="nav-label">Notifications</q-item-label>
+              </q-item-section>
+            </q-item>
+
+            <!-- YOU -->
+            <div class="nav-section-label">
+              <span>You</span>
+              <div class="nav-section-line"></div>
+            </div>
+
+            <q-item clickable v-ripple :to="{ name: 'ProfileView' }" class="nav-item">
+              <q-item-section avatar>
+                <q-icon name="person_outline" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="nav-label">Profile</q-item-label>
+              </q-item-section>
+            </q-item>
+
+            <q-item clickable v-ripple :to="{ name: 'Settings' }" class="nav-item">
               <q-item-section avatar>
                 <q-icon name="settings" />
               </q-item-section>
@@ -174,6 +210,19 @@
             </q-item>
           </q-list>
 
+          <!-- Now Playing Widget (sidebar) -->
+          <div v-if="nowPlaying?.isPlaying" class="now-playing-sidebar" @click="showNowPlayingDialog = true">
+            <img v-if="nowPlaying.albumImage" :src="nowPlaying.albumImage" class="nps-album" />
+            <q-icon v-else name="music_note" size="20px" color="green" />
+            <div class="nps-info">
+              <div class="nps-track">{{ nowPlaying.trackName }}</div>
+              <div class="nps-artist">{{ nowPlaying.artistName }}</div>
+            </div>
+            <div class="nps-bars">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+
           <!-- Drawer Footer -->
           <div class="drawer-footer">
             <img src="@/assets/venyuUpscaled.png" alt="venyu" class="drawer-footer-logo" />
@@ -182,6 +231,9 @@
         </div>
       </q-scroll-area>
     </q-drawer>
+
+    <!-- Search Modal -->
+    <SearchModal v-model="showSearch" />
 
     <!-- PAGE CONTENT -->
     <q-page-container>
@@ -229,6 +281,7 @@ import { usePresenceStore } from '@/stores/active';
 import { useChatsStore } from '@/stores/chats';
 import { api } from '@/api';
 import { Notify } from 'quasar';
+import SearchModal from '@/components/SearchModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -330,20 +383,32 @@ onMounted(async () => {
 
   // Pause/resume when tab visibility changes
   document.addEventListener('visibilitychange', onVisChange);
+
+  // Ctrl+K / Cmd+K to open search
+  document.addEventListener('keydown', handleSearchShortcut);
 });
 
 const onVisChange = () => {
   if (!document.hidden && auth.isAuthenticated) fetchNowPlaying();
 };
 
+const handleSearchShortcut = (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    showSearch.value = true;
+  }
+};
+
 onUnmounted(() => {
   if (nowPlayingInterval) clearInterval(nowPlayingInterval);
   if (npTickInterval) clearInterval(npTickInterval);
   document.removeEventListener('visibilitychange', onVisChange);
+  document.removeEventListener('keydown', handleSearchShortcut);
 });
 
 const leftDrawerOpen = ref(true);
-const searchQuery = ref("");
+const showSearch = ref(false);
+const isMac = computed(() => navigator.platform.toUpperCase().indexOf('MAC') >= 0);
 
 // Get user data from auth store - match your User model fields
 const isAuthenticated = computed(() => auth.isAuthenticated);
@@ -469,39 +534,49 @@ body,
   transform: scale(1.04);
 }
 
-/* Search Bar */
-.search-bar {
-  width: 100%;
-  max-width: 400px;
+/* Search Trigger */
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 260px;
+  height: 34px;
+  padding: 0 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.search-bar .q-field__control {
-  border-radius: 10px !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  min-height: 36px !important;
-  transition: all 0.25s ease;
+.search-trigger:hover {
+  border-color: rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.search-bar .q-field__control:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(139, 92, 246, 0.2) !important;
+.search-trigger .q-icon {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 16px;
 }
 
-.search-bar .q-field--focused .q-field__control {
-  background: rgba(139, 92, 246, 0.08) !important;
-  border-color: rgba(139, 92, 246, 0.35) !important;
-  box-shadow: 0 0 16px rgba(139, 92, 246, 0.1);
+.search-trigger-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.25);
 }
 
-.search-bar .q-field__prepend .q-icon {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.3);
+.search-trigger-kbd {
+  margin-left: auto;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  border: none;
 }
 
-.search-bar .q-placeholder {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.35) !important;
+.search-mobile-btn {
+  color: rgba(255, 255, 255, 0.55) !important;
 }
 
 /* Header Icon Buttons */
@@ -688,7 +763,7 @@ aside.glass-drawer {
 }
 
 .profile-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: #ffffff !important;
   margin-bottom: 2px;
@@ -696,7 +771,7 @@ aside.glass-drawer {
 }
 
 .profile-handle {
-  font-size: 12.5px;
+  font-size: 11px;
   color: rgba(167, 139, 250, 0.6) !important;
   font-weight: 500;
 }
@@ -708,33 +783,51 @@ aside.glass-drawer {
 }
 
 .nav-section-label {
-  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.28) !important;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.25) !important;
   padding: 14px 14px 6px;
 }
 
+.nav-section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+}
+
+/* Nav Badge Pill */
+.nav-badge-pill {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
+  font-size: 9px;
+  min-height: 16px;
+  padding: 0 6px;
+}
+
 .nav-item {
-  border-radius: 10px;
+  border-radius: 12px;
   margin-bottom: 2px;
-  min-height: 44px;
+  min-height: 40px;
+  padding: 10px 12px;
   transition: all 0.2s ease;
-  color: rgba(255, 255, 255, 0.7) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
 }
 
 .nav-item .q-item__label,
 .nav-item .q-item__section--main {
-  color: rgba(255, 255, 255, 0.7) !important;
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
 .nav-item .q-icon {
-  color: rgba(255, 255, 255, 0.4) !important;
-  font-size: 21px;
+  color: rgba(255, 255, 255, 0.35) !important;
+  font-size: 20px;
   transition: color 0.2s ease;
 }
 
@@ -753,7 +846,7 @@ aside.glass-drawer {
 
 /* Active nav item */
 .nav-item.q-router-link--active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.06) 100%) !important;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(236, 72, 153, 0.04) 100%) !important;
   position: relative;
 }
 
@@ -776,6 +869,7 @@ aside.glass-drawer {
 
 .nav-item.q-router-link--active .q-icon {
   color: #a78bfa !important;
+  filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.3));
 }
 
 /* Drawer Footer */
@@ -801,6 +895,77 @@ aside.glass-drawer {
   font-weight: 500;
   font-style: italic;
 }
+
+/* Now Playing Sidebar Widget */
+.now-playing-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 12px;
+  padding: 10px 12px;
+  background: rgba(30, 215, 96, 0.05);
+  border: 1px solid rgba(30, 215, 96, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.now-playing-sidebar:hover {
+  background: rgba(30, 215, 96, 0.1);
+  border-color: rgba(30, 215, 96, 0.22);
+}
+
+.nps-album {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.nps-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.nps-track {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1ed760;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.nps-artist {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.nps-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.nps-bars span {
+  display: block;
+  width: 2.5px;
+  background: #1ed760;
+  border-radius: 2px;
+  animation: np-bar-bounce 0.8s ease-in-out infinite alternate;
+}
+
+.nps-bars span:nth-child(1) { height: 5px; animation-delay: 0s; }
+.nps-bars span:nth-child(2) { height: 10px; animation-delay: 0.2s; }
+.nps-bars span:nth-child(3) { height: 4px; animation-delay: 0.4s; }
 
 /* ========== RESPONSIVE ========== */
 @media (max-width: 1023px) {

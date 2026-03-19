@@ -440,6 +440,10 @@ const sendMessage = () => {
 onMounted(async () => {
   if (!userStore.me) await userStore.fetchMe();
   if (!eventsStore.list.length) eventsStore.fetchNearby();
+
+  // Sync fresh Spotify data before fetching candidates so match scores are current
+  try { await api.syncSpotifyData(); } catch (e) { console.warn('Spotify sync failed:', e); }
+
   await matchesStore.fetchMatches(true);
   await fetchNowPlayingForVisible();
   npPollInterval = setInterval(fetchNowPlayingForVisible, 5000);

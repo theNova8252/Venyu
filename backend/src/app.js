@@ -17,6 +17,7 @@ import chatRoutes from './api/routes/chatRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import eventRoutes from './api/routes/eventRoutes.js';
 import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
+import searchRoutes from './api/routes/searchRoutes.js';
 import autoRefreshToken from './middleware/autoRefresh.js';
 
 // Modelle
@@ -170,6 +171,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/events', eventRsvpRoutes);
+app.use('/api/search', searchRoutes);
 
 // === Matches: Kandidaten für Discover ===
 app.get('/api/matches/candidates', async (req, res, next) => {

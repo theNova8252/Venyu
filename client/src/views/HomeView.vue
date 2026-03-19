@@ -453,6 +453,7 @@ const refreshAll = async () => {
   loadingMatches.value = true;
   loadingEvents.value = true;
 
+  try { await api.syncSpotifyData(); } catch (e) { console.warn('Spotify sync failed:', e); }
   await user.fetchMe();
   await matches.fetchMatches();
   await events.fetchNearby();
@@ -479,6 +480,7 @@ const goingEvents = computed(() => {
 
 const fetchRecentlyPlayed = async () => {
   loadingRecent.value = true;
+  try { await api.syncSpotifyData(); } catch (e) { console.warn('Spotify sync failed:', e); }
   await user.fetchMe();
   loadingRecent.value = false;
 };
@@ -505,6 +507,11 @@ onMounted(async () => {
   loadingMe.value = false;
   loadingMatches.value = false;
   loadingEvents.value = false;
+
+  // Sync fresh Spotify data in the background on page load
+  api.syncSpotifyData()
+    .then(() => user.fetchMe())
+    .catch((e) => console.warn('Background Spotify sync failed:', e));
 
   await fetchCurrentlyPlaying();
   npInterval = setInterval(fetchCurrentlyPlaying, 5000);
