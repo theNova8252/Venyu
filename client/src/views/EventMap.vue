@@ -8,7 +8,7 @@
       </div>
       <div class="topbar-right">
         <div v-if="events.loading" class="topbar-badge loading">Loading…</div>
-        <div class="topbar-badge count">{{ events.list.length }} events</div>
+        <div class="topbar-badge count">{{ filteredEvents.length }} events</div>
       </div>
     </div>
 
@@ -41,6 +41,54 @@
           <div class="sr-title">{{ ev.title }}</div>
           <div class="sr-meta">{{ ev.venue }} · {{ ev.city }} · {{ new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <!-- Date quick-filters -->
+      <div class="filter-chips">
+        <button
+          v-for="opt in dateOptions"
+          :key="opt.key"
+          class="filter-chip"
+          :class="{ active: activeDate === opt.key }"
+          @click="setDateFilter(opt.key)"
+        >
+          <q-icon :name="opt.icon" size="14px" />
+          <span>{{ opt.label }}</span>
+        </button>
+      </div>
+      <!-- Genre dropdown -->
+      <div class="genre-dropdown-wrapper">
+        <button class="genre-toggle" @click="genreDropOpen = !genreDropOpen">
+          <q-icon name="music_note" size="14px" />
+          <span>{{ activeGenre || 'All Genres' }}</span>
+          <q-icon :name="genreDropOpen ? 'expand_less' : 'expand_more'" size="16px" />
+        </button>
+        <transition name="fade-drop">
+          <div v-if="genreDropOpen" class="genre-dropdown">
+            <button
+              class="genre-option"
+              :class="{ active: activeGenre === '' }"
+              @click="setGenre('')"
+            >All Genres</button>
+            <button
+              v-for="g in availableGenres"
+              :key="g"
+              class="genre-option"
+              :class="{ active: activeGenre === g }"
+              @click="setGenre(g)"
+            >{{ g }}</button>
+          </div>
+        </transition>
+      </div>
+      <!-- Active filter count -->
+      <div v-if="filtersActive" class="filter-count">
+        {{ filteredEvents.length }} / {{ events.list.length }}
+        <button class="filter-clear" @click="clearFilters" title="Clear filters">
+          <q-icon name="close" size="14px" />
+        </button>
       </div>
     </div>
 
@@ -106,6 +154,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import mapboxgl from "mapbox-gl";
 import { useEventsStore } from "@/stores/events";
+import ticketmasterLogo from "@/assets/ticketmasterLogo.png";
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -114,12 +163,91 @@ const panelOpen = ref(false);
 const searchQuery = ref('');
 const showSearchResults = ref(false);
 const heatmapActive = ref(false);
+const activeDate = ref('all');
+const activeGenre = ref('');
+const genreDropOpen = ref(false);
 let map = null;
 let activePopup = null;
 let userMarker = null;
 
+// Date filter options
+const dateOptions = [
+  { key: 'all', label: 'All', icon: 'date_range' },
+  { key: 'today', label: 'Today', icon: 'today' },
+  { key: 'week', label: 'This Week', icon: 'view_week' },
+  { key: 'month', label: 'This Month', icon: 'calendar_month' },
+];
+
+// Unique genres derived from current event list
+const availableGenres = computed(() => {
+  const genres = new Set();
+  events.list.forEach((ev) => {
+    if (ev.category && ev.category !== 'Undefined' && ev.category !== 'Other') {
+      genres.add(ev.category);
+    }
+  });
+  return [...genres].sort();
+});
+
+// Filtered events based on active date + genre
+const filteredEvents = computed(() => {
+  let list = events.list;
+
+  // Genre filter
+  if (activeGenre.value) {
+    list = list.filter((ev) => ev.category === activeGenre.value);
+  }
+
+  // Date filter
+  if (activeDate.value !== 'all') {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (activeDate.value === 'today') {
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+      list = list.filter((ev) => {
+        const d = new Date(ev.date);
+        return d >= startOfDay && d < endOfDay;
+      });
+    } else if (activeDate.value === 'week') {
+      const endOfWeek = new Date(startOfDay);
+      endOfWeek.setDate(endOfWeek.getDate() + 7);
+      list = list.filter((ev) => {
+        const d = new Date(ev.date);
+        return d >= startOfDay && d < endOfWeek;
+      });
+    } else if (activeDate.value === 'month') {
+      const endOfMonth = new Date(startOfDay);
+      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+      list = list.filter((ev) => {
+        const d = new Date(ev.date);
+        return d >= startOfDay && d < endOfMonth;
+      });
+    }
+  }
+
+  return list;
+});
+
+const filtersActive = computed(() => activeDate.value !== 'all' || activeGenre.value !== '');
+
+function setDateFilter(key) {
+  activeDate.value = key;
+}
+
+function setGenre(genre) {
+  activeGenre.value = genre;
+  genreDropOpen.value = false;
+}
+
+function clearFilters() {
+  activeDate.value = 'all';
+  activeGenre.value = '';
+}
+
 const sortedEvents = computed(() =>
-  [...events.list].sort((a, b) => new Date(a.date) - new Date(b.date))
+  [...filteredEvents.value].sort((a, b) => new Date(a.date) - new Date(b.date))
 );
 
 const formatMonth = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
@@ -158,7 +286,7 @@ function selectSearchResult(ev) {
   // Open popup for this event after fly
   setTimeout(() => {
     if (activePopup) activePopup.remove();
-    activePopup = new mapboxgl.Popup({ offset: 18, maxWidth: '320px', closeButton: true, closeOnClick: false })
+    activePopup = new mapboxgl.Popup({ offset: 10, maxWidth: '340px', closeButton: true, closeOnClick: false })
       .setLngLat([ev.lng, ev.lat])
       .setDOMContent(buildEventPopup([ev]))
       .addTo(map);
@@ -192,15 +320,19 @@ function onDocClick(e) {
   if (!e.target.closest('.search-container')) {
     showSearchResults.value = false;
   }
+  if (!e.target.closest('.genre-dropdown-wrapper')) {
+    genreDropOpen.value = false;
+  }
 }
 
 function updateMapSource() {
   if (!map) return;
+  const visible = filteredEvents.value;
   if (map.getSource('events')) {
-    map.getSource('events').setData(buildGeoJSON(events.list));
+    map.getSource('events').setData(buildGeoJSON(visible));
   }
   if (map.getSource('events-heat')) {
-    map.getSource('events-heat').setData(buildHeatGeoJSON(events.list));
+    map.getSource('events-heat').setData(buildHeatGeoJSON(visible));
   }
 }
 
@@ -229,33 +361,50 @@ function buildEventPopup(eventData) {
 
     container.innerHTML = `
       <div class="popup-card">
-        ${event.image ? `<div class="popup-img" style="background-image:url('${encodeURI(event.image)}')"></div>` : ''}
-        <div class="popup-body">
-          <div class="popup-date-chip">${dateStr}</div>
-          <div class="popup-title">${safeTitle}</div>
-          <div class="popup-venue-row">
-            <span class="popup-venue-icon">📍</span>
-            <span>${safeVenue} · ${safeCity}</span>
+        ${event.image ? `
+          <div class="popup-hero">
+            <div class="popup-img" style="background-image:url('${encodeURI(event.image)}')"></div>
+            <div class="popup-img-fade"></div>
+            <span class="popup-date-float">${dateStr}</span>
           </div>
-          ${event.priceRange ? `<div class="popup-price">From €${event.priceRange.min}</div>` : ''}
+        ` : `<div class="popup-date-chip">${dateStr}</div>`}
+        <div class="popup-body">
+          <div class="popup-title">${safeTitle}</div>
+          <div class="popup-meta">
+            <span class="material-icons popup-meta-icon">place</span>
+            <span>${safeVenue} &middot; ${safeCity}</span>
+          </div>
+          ${event.priceRange ? `
+            <div class="popup-price">
+              <span class="material-icons popup-meta-icon">confirmation_number</span>
+              From &euro;${event.priceRange.min}
+            </div>
+          ` : ''}
           <div class="popup-actions">
             <button class="action-btn ${interested ? 'active interested' : ''}"
               data-action="toggleInterested" data-id="${event.id}">
-              ${interested ? '★ Interested' : '☆ Interested'}
+              <span class="material-icons action-icon">${interested ? 'star' : 'star_outline'}</span>
+              Interested
             </button>
             <button class="action-btn ${going ? 'active going' : ''}"
               data-action="toggleGoing" data-id="${event.id}">
-              ${going ? '✔ Going' : '+ Going'}
+              <span class="material-icons action-icon">${going ? 'check_circle' : 'add_circle_outline'}</span>
+              Going
             </button>
           </div>
-          ${event.url ? `<a class="popup-link" href="${encodeURI(event.url)}" target="_blank" rel="noopener noreferrer">Get Tickets →</a>` : ''}
+          ${event.url ? `
+            <a class="popup-tm-link" href="${encodeURI(event.url)}" target="_blank" rel="noopener noreferrer">
+              <img src="${ticketmasterLogo}" alt="Ticketmaster" class="tm-logo" />
+              <span class="tm-label">Get Tickets</span>
+            </a>
+          ` : ''}
         </div>
       </div>
       ${eventList.length > 1 ? `
         <div class="popup-nav">
-          <button class="nav-btn" data-action="prev">‹</button>
-          <div class="nav-counter">${currentIndex + 1} / ${eventList.length}</div>
-          <button class="nav-btn" data-action="next">›</button>
+          <button class="nav-btn" data-action="prev"><span class="material-icons">chevron_left</span></button>
+          <div class="nav-dots">${currentIndex + 1} / ${eventList.length}</div>
+          <button class="nav-btn" data-action="next"><span class="material-icons">chevron_right</span></button>
         </div>
       ` : ''}
     `;
@@ -345,7 +494,7 @@ onMounted(async () => {
     // Add clustered GeoJSON source
     map.addSource('events', {
       type: 'geojson',
-      data: buildGeoJSON(events.list),
+      data: buildGeoJSON(filteredEvents.value),
       cluster: true,
       clusterMaxZoom: 14,
       clusterRadius: 60,
@@ -354,7 +503,7 @@ onMounted(async () => {
     // Heatmap GeoJSON source (no clustering)
     map.addSource('events-heat', {
       type: 'geojson',
-      data: buildHeatGeoJSON(events.list),
+      data: buildHeatGeoJSON(filteredEvents.value),
     });
 
     // Cluster circle layer
@@ -489,7 +638,7 @@ onMounted(async () => {
       }];
 
       if (activePopup) activePopup.remove();
-      activePopup = new mapboxgl.Popup({ offset: 18, maxWidth: '320px', closeButton: true, closeOnClick: false })
+      activePopup = new mapboxgl.Popup({ offset: 10, maxWidth: '340px', closeButton: true, closeOnClick: false })
         .setLngLat(coords)
         .setDOMContent(buildEventPopup(popupEvents))
         .addTo(map);
@@ -511,8 +660,9 @@ onMounted(async () => {
         .addTo(map);
     }
 
-    // Keep sources in sync when event list changes
+    // Keep sources in sync when event list or filters change
     watch(() => events.list, () => updateMapSource(), { deep: true });
+    watch(filteredEvents, () => updateMapSource());
   });
 
   document.addEventListener('click', onDocClick);
@@ -693,6 +843,160 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---- Filter bar ---- */
+.filter-bar {
+  position: absolute;
+  top: 102px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+}
+.filter-chips {
+  display: flex;
+  gap: 4px;
+}
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10, 10, 18, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.55);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.filter-chip:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: rgba(255,255,255,0.8);
+}
+.filter-chip.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+/* Genre dropdown */
+.genre-dropdown-wrapper {
+  position: relative;
+}
+.genre-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10, 10, 18, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(255,255,255,0.55);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.genre-toggle:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.25);
+  color: rgba(255,255,255,0.8);
+}
+.genre-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 160px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: rgba(10, 10, 18, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.genre-dropdown::-webkit-scrollbar { width: 4px; }
+.genre-dropdown::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.genre-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  border: none;
+  background: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.genre-option:hover {
+  background: rgba(168, 85, 247, 0.12);
+  color: #fff;
+}
+.genre-option.active {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+
+/* Fade-drop transition for genre dropdown */
+.fade-drop-enter-active,
+.fade-drop-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fade-drop-enter-from,
+.fade-drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* Filter count badge */
+.filter-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c084fc;
+  padding: 4px 8px 4px 10px;
+  border-radius: 10px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  white-space: nowrap;
+}
+.filter-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+.filter-clear:hover {
+  color: #fff;
 }
 
 /* ---- My location button ---- */
@@ -896,128 +1200,220 @@ onUnmounted(() => {
 @media (max-width: 600px) {
   .event-panel { width: calc(100% - 32px); bottom: 24px; }
   .map-topbar { width: calc(100% - 32px); }
+  .filter-bar { flex-wrap: wrap; }
+  .filter-chips { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 </style>
 
 <!-- Unscoped for mapbox popup overrides -->
 <style>
-/* Popup card */
+/* ---- Liquid Glass Popup ---- */
+.mapboxgl-popup-content {
+  background: rgba(14, 14, 24, 0.78) !important;
+  backdrop-filter: blur(20px) saturate(1.6) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) !important;
+  padding: 0 !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  overflow: hidden !important;
+}
+.mapboxgl-popup-tip {
+  display: none !important;
+}
+.mapboxgl-popup-close-button {
+  font-size: 18px !important;
+  padding: 8px 10px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  z-index: 5 !important;
+  transition: color 0.15s ease !important;
+}
+.mapboxgl-popup-close-button:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+}
+
+/* Popup carousel */
 .popup-carousel {
-  min-width: 260px;
+  min-width: 280px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif;
 }
-.popup-card {
+
+/* Hero image section */
+.popup-hero {
+  position: relative;
+  height: 150px;
   overflow: hidden;
 }
 .popup-img {
   width: 100%;
-  height: 120px;
+  height: 100%;
   background-size: cover;
   background-position: center;
-  border-radius: 10px;
-  margin-bottom: 12px;
 }
-.popup-body {
-  padding: 0 2px;
+.popup-img-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  background: linear-gradient(to top, rgba(14, 14, 24, 0.95), transparent);
+  pointer-events: none;
 }
+.popup-date-float {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(139, 92, 246, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 4px 10px;
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+}
+
+/* Fallback date chip when no image */
 .popup-date-chip {
   display: inline-block;
   font-size: 11px;
   font-weight: 700;
-  color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.1);
-  padding: 3px 10px;
-  border-radius: 99px;
-  margin-bottom: 8px;
+  color: #c084fc;
+  background: rgba(139, 92, 246, 0.15);
+  padding: 4px 12px;
+  border-radius: 8px;
+  margin: 14px 14px 0;
+}
+
+/* Body */
+.popup-body {
+  padding: 14px 16px 16px;
 }
 .popup-title {
   font-weight: 800;
-  font-size: 15px;
-  color: #1a1a1a;
-  line-height: 1.3;
-  margin-bottom: 6px;
+  font-size: 16px;
+  color: #fff;
+  line-height: 1.25;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
 }
-.popup-venue-row {
+.popup-meta {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 12px;
-  color: #6a6a6a;
+  color: rgba(255, 255, 255, 0.55);
   margin-bottom: 4px;
 }
-.popup-venue-icon { font-size: 13px; }
+.popup-meta-icon {
+  font-size: 15px !important;
+  opacity: 0.6;
+}
 .popup-price {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 700;
-  color: #059669;
-  margin-bottom: 10px;
+  color: #34d399;
+  margin-bottom: 14px;
+}
+.popup-price .popup-meta-icon {
+  color: #34d399;
 }
 
+/* RSVP action buttons */
 .popup-actions {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .action-btn {
   flex: 1;
-  border: 1.5px solid rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   padding: 8px 10px;
   border-radius: 10px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #555;
+  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   text-align: center;
+  font-family: inherit;
+}
+.action-icon {
+  font-size: 16px !important;
 }
 .action-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 .action-btn.active.interested {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.12), rgba(236, 72, 153, 0.06));
-  border-color: rgba(236, 72, 153, 0.35);
-  color: #db2777;
+  background: rgba(236, 72, 153, 0.15);
+  border-color: rgba(236, 72, 153, 0.4);
+  color: #f472b6;
 }
 .action-btn.active.going {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(139, 92, 246, 0.06));
-  border-color: rgba(139, 92, 246, 0.35);
-  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #a78bfa;
 }
 
-.popup-link {
-  display: block;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 700;
-  color: white;
+/* Ticketmaster branded link */
+.popup-tm-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   text-decoration: none;
-  background: linear-gradient(135deg, #a855f7, #ec4899);
+  background: #026CDF;
   padding: 10px 16px;
   border-radius: 10px;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 4px 16px rgba(2, 108, 223, 0.3);
 }
-.popup-link:hover {
+.popup-tm-link:hover {
+  background: #0580FF;
+  box-shadow: 0 6px 24px rgba(2, 108, 223, 0.45);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45);
+}
+.tm-logo {
+  height: 18px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(10);
+}
+.tm-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
 }
 
+/* Carousel navigation */
 .popup-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 10px 16px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .nav-btn {
-  background: rgba(139, 92, 246, 0.08);
-  border: 1.5px solid rgba(139, 92, 246, 0.2);
-  color: #8b5cf6;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -1025,47 +1421,23 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  font-weight: 700;
   padding: 0;
   transition: all 0.15s ease;
 }
-.nav-btn:hover {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+.nav-btn .material-icons {
+  font-size: 20px !important;
 }
-.nav-counter {
+.nav-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.nav-dots {
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: rgba(255, 255, 255, 0.4);
   flex: 1;
   text-align: center;
-}
-
-/* Mapbox popup overrides */
-.mapboxgl-popup-content {
-  background: #fff !important;
-  padding: 16px !important;
-  border-radius: 16px !important;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.04) !important;
-}
-.mapboxgl-popup-tip {
-  border-top-color: #fff !important;
-}
-.mapboxgl-popup-anchor-top .mapboxgl-popup-tip { border-bottom-color: #fff !important; }
-.mapboxgl-popup-anchor-left .mapboxgl-popup-tip { border-right-color: #fff !important; }
-.mapboxgl-popup-anchor-right .mapboxgl-popup-tip { border-left-color: #fff !important; }
-
-.mapboxgl-popup-close-button {
-  font-size: 20px;
-  padding: 6px 10px;
-  color: #aaa;
-  transition: color 0.15s ease;
-}
-.mapboxgl-popup-close-button:hover {
-  color: #ec4899;
-  background: rgba(236, 72, 153, 0.08);
-  border-radius: 6px;
 }
 
 /* Mapbox controls */
