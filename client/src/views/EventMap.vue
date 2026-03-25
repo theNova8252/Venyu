@@ -86,6 +86,18 @@
     <button class="locate-btn" @click="goToMyLocation" title="Go to my location">
       <q-icon name="my_location" size="20px" />
     </button>
+
+    <!-- Heatmap toggle button -->
+    <button
+      class="heatmap-toggle"
+      :class="{ active: heatmapActive }"
+      @click="toggleHeatmap"
+      title="Toggle heatmap"
+      aria-label="Toggle heatmap view"
+      :aria-pressed="heatmapActive"
+    >
+      <q-icon name="layers" size="20px" />
+    </button>
   </q-page>
 </template>
 
@@ -101,6 +113,7 @@ const events = useEventsStore();
 const panelOpen = ref(false);
 const searchQuery = ref('');
 const showSearchResults = ref(false);
+const heatmapActive = ref(false);
 let map = null;
 let activePopup = null;
 let userMarker = null;
@@ -158,6 +171,22 @@ function clearSearch() {
   showSearchResults.value = false;
 }
 
+function toggleHeatmap() {
+  if (!map) return;
+  heatmapActive.value = !heatmapActive.value;
+  const markerVis = heatmapActive.value ? 'none' : 'visible';
+  const heatVis = heatmapActive.value ? 'visible' : 'none';
+
+  ['clusters', 'cluster-count', 'unclustered-point', 'unclustered-glow']
+    .forEach((id) => map.setLayoutProperty(id, 'visibility', markerVis));
+  map.setLayoutProperty('heatmap-layer', 'visibility', heatVis);
+
+  if (heatmapActive.value && activePopup) {
+    activePopup.remove();
+    activePopup = null;
+  }
+}
+
 // Close search dropdown when clicking outside
 function onDocClick(e) {
   if (!e.target.closest('.search-container')) {
@@ -166,8 +195,13 @@ function onDocClick(e) {
 }
 
 function updateMapSource() {
-  if (!map || !map.getSource('events')) return;
-  map.getSource('events').setData(buildGeoJSON(events.list));
+  if (!map) return;
+  if (map.getSource('events')) {
+    map.getSource('events').setData(buildGeoJSON(events.list));
+  }
+  if (map.getSource('events-heat')) {
+    map.getSource('events-heat').setData(buildHeatGeoJSON(events.list));
+  }
 }
 
 function escapeHtml(str) {
@@ -273,6 +307,20 @@ function buildGeoJSON(eventList) {
   };
 }
 
+function buildHeatGeoJSON(eventList) {
+  const festivalPattern = /festival|fest\b|open\s*air|multi[-\s]?day/i;
+  return {
+    type: 'FeatureCollection',
+    features: eventList.map((ev) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [ev.lng, ev.lat] },
+      properties: {
+        weight: festivalPattern.test(ev.title) ? 3 : 1,
+      },
+    })),
+  };
+}
+
 onMounted(async () => {
   await events.fetchNearby();
 
@@ -301,6 +349,12 @@ onMounted(async () => {
       cluster: true,
       clusterMaxZoom: 14,
       clusterRadius: 60,
+    });
+
+    // Heatmap GeoJSON source (no clustering)
+    map.addSource('events-heat', {
+      type: 'geojson',
+      data: buildHeatGeoJSON(events.list),
     });
 
     // Cluster circle layer
@@ -370,6 +424,38 @@ onMounted(async () => {
       },
     });
 
+    // Heatmap density layer (hidden by default)
+    map.addLayer({
+      id: 'heatmap-layer',
+      type: 'heatmap',
+      source: 'events-heat',
+      layout: { visibility: 'none' },
+      paint: {
+        'heatmap-weight': ['get', 'weight'],
+        'heatmap-intensity': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 1,
+          12, 3,
+        ],
+        'heatmap-color': [
+          'interpolate', ['linear'], ['heatmap-density'],
+          0, 'rgba(0, 0, 0, 0)',
+          0.2, '#a855f7',
+          0.5, '#ec4899',
+          0.8, '#f43f5e',
+          1.0, '#ff2d55',
+        ],
+        'heatmap-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 15,
+          6, 30,
+          12, 50,
+          16, 80,
+        ],
+        'heatmap-opacity': 0.75,
+      },
+    });
+
     // Click on cluster -> zoom in
     map.on('click', 'clusters', (e) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
@@ -424,6 +510,9 @@ onMounted(async () => {
         .setLngLat([events.userLng, events.userLat])
         .addTo(map);
     }
+
+    // Keep sources in sync when event list changes
+    watch(() => events.list, () => updateMapSource(), { deep: true });
   });
 
   document.addEventListener('click', onDocClick);
@@ -652,6 +741,35 @@ onUnmounted(() => {
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 .panel-toggle:hover {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+/* ---- Heatmap toggle ---- */
+.heatmap-toggle {
+  position: absolute;
+  top: 108px;
+  right: 16px;
+  z-index: 12;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(10, 10, 18, 0.8);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.heatmap-toggle:hover {
+  background: rgba(168, 85, 247, 0.3);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+.heatmap-toggle.active {
   background: rgba(168, 85, 247, 0.3);
   border-color: rgba(168, 85, 247, 0.5);
 }
