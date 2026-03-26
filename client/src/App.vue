@@ -38,6 +38,60 @@
             </div>
           </div>
 
+          <q-btn flat round dense icon="notifications_none" class="header-icon-btn notification-btn">
+            <q-badge
+              v-if="unreadNotifications > 0"
+              floating
+              rounded
+              class="notification-badge"
+            >
+              {{ unreadNotifications }}
+            </q-badge>
+
+            <q-menu class="notification-dropdown" @show="notifications.markAllRead()">
+              <div class="notification-panel">
+                <div class="notification-panel__head">
+                  <div>
+                    <div class="notification-panel__eyebrow">Updates</div>
+                    <div class="notification-panel__title">Notifications</div>
+                  </div>
+                  <button
+                    v-if="recentNotifications.length"
+                    class="notification-panel__link"
+                    @click="openNotificationsPage"
+                  >
+                    View all
+                  </button>
+                </div>
+
+                <div v-if="recentNotifications.length" class="notification-list">
+                  <button
+                    v-for="item in recentNotifications"
+                    :key="item.id"
+                    class="notification-item"
+                    @click="openNotification(item)"
+                  >
+                    <div class="notification-item__icon" :class="`notification-item__icon--${item.type}`">
+                      <q-icon :name="item.icon || 'notifications'" size="18px" />
+                    </div>
+                    <div class="notification-item__body">
+                      <div class="notification-item__top">
+                        <span class="notification-item__title">{{ item.title }}</span>
+                        <span class="notification-item__time">{{ formatNotificationTime(item.createdAt) }}</span>
+                      </div>
+                      <p class="notification-item__message">{{ item.message }}</p>
+                    </div>
+                  </button>
+                </div>
+
+                <div v-else class="notification-empty">
+                  <q-icon name="notifications_off" size="24px" />
+                  <span>No notifications yet</span>
+                </div>
+              </div>
+            </q-menu>
+          </q-btn>
+
           <!-- Profile Menu -->
           <q-btn flat round dense class="profile-avatar-btn">
             <q-avatar size="34px" class="avatar-ring">
@@ -167,24 +221,6 @@
               </q-item-section>
             </q-item>
 
-            <q-item clickable v-ripple :to="{ name: 'Favorites' }" class="nav-item">
-              <q-item-section avatar>
-                <q-icon name="star_outline" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="nav-label">Favorites</q-item-label>
-              </q-item-section>
-            </q-item>
-
-            <q-item clickable v-ripple :to="{ name: 'Notifications' }" class="nav-item">
-              <q-item-section avatar>
-                <q-icon name="notifications_none" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="nav-label">Notifications</q-item-label>
-              </q-item-section>
-            </q-item>
-
             <!-- YOU -->
             <div class="nav-section-label">
               <span>You</span>
@@ -279,8 +315,8 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from '@/stores/auth';
 import { usePresenceStore } from '@/stores/active';
 import { useChatsStore } from '@/stores/chats';
+import { useNotificationsStore } from '@/stores/notifications';
 import { api } from '@/api';
-import { Notify } from 'quasar';
 import SearchModal from '@/components/SearchModal.vue';
 
 const router = useRouter();
@@ -288,6 +324,7 @@ const route = useRoute();
 const auth = useAuthStore();
 const presenceStore = usePresenceStore();
 const chatsStore = useChatsStore();
+const notifications = useNotificationsStore();
 
 // Match popup state
 const showMatchPopup = ref(false);
@@ -297,18 +334,16 @@ const matchRoomId = ref(null);
 // Watch for incoming match events from the presence WS
 watch(() => presenceStore.pendingMatch, (match) => {
   if (!match) return;
-  matchedUser.value = match.user;
-  matchRoomId.value = match.roomId;
-  showMatchPopup.value = true;
-
-  // Also show a notification
-  Notify.create({
-    message: `You matched with ${match.user?.name || 'someone'}!`,
-    color: 'pink-6',
-    icon: 'favorite',
-    position: 'top',
-    timeout: 5000,
+  notifications.addMatch({
+    user: match.user,
+    roomId: match.roomId,
   });
+
+  if (route.name !== 'SwipeCard') {
+    matchedUser.value = match.user;
+    matchRoomId.value = match.roomId;
+    showMatchPopup.value = true;
+  }
 
   // Refresh chat list
   chatsStore.fetchChats();
@@ -426,9 +461,42 @@ const userAvatar = computed(() => {
   return "https://api.dicebear.com/7.x/avataaars/svg?seed=default";
 });
 const unreadMessages = ref(0);
+const unreadNotifications = computed(() => notifications.unreadCount);
+const recentNotifications = computed(() => notifications.recentItems);
 
 const toggleLeftDrawer = () => {
   leftDrawerOpen.value = !leftDrawerOpen.value;
+};
+
+const formatNotificationTime = (isoString) => {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (!Number.isFinite(date.getTime())) return '';
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+
+  if (diffMinutes < 1) return 'now';
+  if (diffMinutes < 60) return `${diffMinutes}m`;
+  if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}h`;
+  return `${Math.floor(diffMinutes / 1440)}d`;
+};
+
+const openNotification = (item) => {
+  if (item?.id) {
+    notifications.markRead(item.id);
+  }
+
+  if (item?.roomId) {
+    router.push({ name: 'ChatView', params: { roomId: item.roomId } });
+    return;
+  }
+
+  router.push({ name: 'Notifications' });
+};
+
+const openNotificationsPage = () => {
+  router.push({ name: 'Notifications' });
 };
 
 const handleLogout = () => {
@@ -619,6 +687,15 @@ body,
 .profile-avatar-btn:hover .avatar-ring {
   border-color: rgba(139, 92, 246, 0.8) !important;
   box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.notification-badge {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6) !important;
+  color: #fff !important;
+  min-width: 18px;
+  min-height: 18px;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 /* Now Playing Pill */
@@ -1063,6 +1140,149 @@ aside.glass-drawer {
 
 .logout-item .q-icon {
   color: rgba(239, 68, 68, 0.7) !important;
+}
+
+.notification-dropdown.q-menu {
+  background: #13131f !important;
+  border: 1px solid rgba(139, 92, 246, 0.18) !important;
+  border-radius: 18px !important;
+  min-width: 340px !important;
+  max-width: 92vw !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.6),
+    0 0 24px rgba(139, 92, 246, 0.08) !important;
+  overflow: hidden;
+}
+
+.notification-panel {
+  padding: 16px;
+}
+
+.notification-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.notification-panel__eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(167, 139, 250, 0.7);
+}
+
+.notification-panel__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.notification-panel__link {
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.66);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.notification-panel__link:hover {
+  background: rgba(139, 92, 246, 0.14);
+  color: #fff;
+}
+
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notification-item {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.notification-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(139, 92, 246, 0.16);
+  transform: translateY(-1px);
+}
+
+.notification-item__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notification-item__icon--match {
+  background: rgba(236, 72, 153, 0.14);
+  color: #f472b6;
+}
+
+.notification-item__icon--system {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}
+
+.notification-item__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notification-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notification-item__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.notification-item__time {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.notification-item__message {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.notification-empty {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.36);
 }
 
 /* Global dark body */

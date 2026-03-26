@@ -13,7 +13,6 @@ import ChatView from '@/views/ChatView.vue';
 import MatchesView from '@/views/MatchesView.vue';
 import MusicView from '@/views/MusicView.vue';
 import NotificationsView from '@/views/NotificationsView.vue';
-import FavoritesView from '@/views/FavoritesView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 
 const router = createRouter({
@@ -77,12 +76,6 @@ const router = createRouter({
       path: '/notifications',
       name: 'Notifications',
       component: NotificationsView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/favorites',
-      name: 'Favorites',
-      component: FavoritesView,
       meta: { requiresAuth: true },
     },
     {

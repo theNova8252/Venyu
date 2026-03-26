@@ -7,6 +7,7 @@ import {
   fetchMe,
   fetchTopArtists,
   fetchTopTracks,
+  fetchAudioFeatures,
   fetchRecentlyPlayed,
   fetchCurrentlyPlaying,
   fetchDevices,
@@ -143,6 +144,41 @@ const redirectToLandingError = (res, returnTo, error) => {
   return res.redirect(url.toString());
 };
 
+const isUploadedAvatar = (avatarUrl) =>
+  typeof avatarUrl === 'string' && avatarUrl.startsWith('/uploads/');
+
+const getPreferredAvatarUrl = (currentAvatarUrl, spotifyAvatarUrl) => {
+  if (isUploadedAvatar(currentAvatarUrl)) {
+    return currentAvatarUrl;
+  }
+
+  return spotifyAvatarUrl ?? currentAvatarUrl ?? null;
+};
+
+const summarizeAudioFeatures = (audioFeatureItems = []) => {
+  const valid = Array.isArray(audioFeatureItems)
+    ? audioFeatureItems.filter((item) => item && typeof item === 'object')
+    : [];
+
+  if (!valid.length) {
+    return null;
+  }
+
+  const average = (key) => {
+    const values = valid.map((item) => Number(item[key])).filter(Number.isFinite);
+    if (!values.length) return null;
+    const sum = values.reduce((acc, value) => acc + value, 0);
+    return Number((sum / values.length).toFixed(3));
+  };
+
+  return {
+    danceability: average('danceability'),
+    energy: average('energy'),
+    valence: average('valence'),
+    tempo: average('tempo'),
+  };
+};
+
 // ======================= LOGIN =======================
 export const login = (req, res) => {
   const state = typeof req.query.state === 'string' ? req.query.state : '';
@@ -220,8 +256,18 @@ export const callback = async (req, res) => {
         id: a.id,
         name: a.name,
         uri: a.uri,
-      })),
+        })),
     }));
+
+    const topTrackIds = (topTracksRes?.items || [])
+      .map((track) => track?.id)
+      .filter(Boolean)
+      .slice(0, 10);
+    const audioFeaturesRes = topTrackIds.length
+      ? await fetchAudioFeatures(tokens.access_token, topTrackIds)
+      : { audio_features: [] };
+    const audioFeatures = summarizeAudioFeatures(audioFeaturesRes?.audio_features || []);
+
     const recentlyPlayed = (recentlyPlayedRes?.items || []).map((item) => ({
       playedAt: item.played_at,
       track: {
@@ -259,7 +305,7 @@ export const callback = async (req, res) => {
       lastName: signupState.loginOnly ? (user?.lastName ?? null) : signupState.profile.lastName,
       birthDate: signupState.loginOnly ? (user?.birthDate ?? null) : signupState.profile.birthDate,
       email: meProfile.email ?? null,
-      avatarUrl: meProfile.images?.[0]?.url ?? null,
+      avatarUrl: getPreferredAvatarUrl(user?.avatarUrl ?? null, meProfile.images?.[0]?.url ?? null),
       country: meProfile.country ?? null,
       product: meProfile.product ?? null,
       age: signupState.loginOnly ? (user?.age ?? null) : signupState.profile.age,
@@ -270,6 +316,7 @@ export const callback = async (req, res) => {
       topTracks,
       recentlyPlayed,
       genres,
+      audioFeatures,
     };
 
     if (user) {
@@ -297,6 +344,7 @@ export const callback = async (req, res) => {
       topTracks,
       recentlyPlayed,
       genres,
+      audioFeatures,
     });
 
     // cookies
@@ -555,8 +603,17 @@ export const syncMusicData = async (req, res, next) => {
         id: a.id,
         name: a.name,
         uri: a.uri,
-      })),
+        })),
     }));
+
+    const topTrackIds = (topTracksRes?.items || [])
+      .map((track) => track?.id)
+      .filter(Boolean)
+      .slice(0, 10);
+    const audioFeaturesRes = topTrackIds.length
+      ? await fetchAudioFeatures(at, topTrackIds)
+      : { audio_features: [] };
+    const audioFeatures = summarizeAudioFeatures(audioFeaturesRes?.audio_features || []);
 
     const genresSet = new Set();
     topArtists.forEach((a) => (a.genres || []).forEach((g) => genresSet.add(g)));
@@ -590,11 +647,16 @@ export const syncMusicData = async (req, res, next) => {
       topTracks,
       recentlyPlayed,
       genres,
+      audioFeatures,
     });
 
-    // Update avatar on user profile if changed
+    // Preserve manually uploaded avatars and only refresh Spotify-hosted images.
     const newAvatar = meProfile.images?.[0]?.url ?? null;
-    if (newAvatar && newAvatar !== user.avatarUrl) {
+    if (
+      newAvatar
+      && !isUploadedAvatar(user.avatarUrl)
+      && newAvatar !== user.avatarUrl
+    ) {
       await user.update({ avatarUrl: newAvatar });
     }
 

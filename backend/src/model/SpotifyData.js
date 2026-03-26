@@ -34,6 +34,11 @@ SpotifyData.init(
       defaultValue: [],
       field: 'genres',
     },
+    audioFeatures: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'audio_features',
+    },
   },
   {
     sequelize,

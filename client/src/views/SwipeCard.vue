@@ -122,6 +122,17 @@
                   {{ card.name }}<span v-if="card.age != null" class="card__age">, {{ card.age }}</span>
                 </h2>
 
+                <div v-if="card.badges?.length" class="music-badge-row">
+                  <span
+                    v-for="badge in card.badges"
+                    :key="badge.id"
+                    class="music-badge"
+                    :class="`music-badge--${badge.tone}`"
+                  >
+                    {{ badge.title }}
+                  </span>
+                </div>
+
                 <!-- Sound wave + cycling recently played -->
                 <div class="wave-wrap" v-if="card.recentlyPlayed?.length">
                   <div class="wave-bars">
@@ -284,6 +295,7 @@ import { useMatchesStore } from "@/stores/matches";
 import { useChatsStore } from "@/stores/chats";
 import { useEventsStore } from "@/stores/events";
 import { api } from "@/api";
+import { buildMusicBadges } from "@/services/musicBadges";
 
 const $q = useQuasar();
 const userStore = useUserStore();
@@ -363,6 +375,25 @@ const toTrackItems = (value) =>
       : { name: t?.name || "", artist: t?.artist || t?.artists?.[0]?.name || "", albumImage: t?.albumImage || t?.album?.image || t?.album?.images?.[0]?.url || null })
     .filter((t) => t.name);
 
+const toAudioFeatures = (value) => {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+};
+
 const particleStyle = (i) => ({
   '--angle': `${(i / 14) * 360}deg`,
   '--delay': `${(i * 0.07).toFixed(2)}s`,
@@ -377,23 +408,30 @@ const scoreTier = (score) => {
 };
 
 const cards = computed(() =>
-  matchesStore.list.map((m, index) => ({
-    id: m.id ?? m.userId ?? `match-${index}`,
-    userId: m.userId ?? m.id ?? m.user?.id,
-    name: m.displayName ?? m.name ?? "Unknown",
-    age: Number.isFinite(Number(m.age ?? m.user?.age)) ? Number(m.age ?? m.user?.age) : null,
-    avatar: m.avatar ?? m.avatar_url ?? m.avatarUrl ?? `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
-    bio: m.bio ?? null,
-    distance: m.distance ?? (m.distanceKm != null ? `${m.distanceKm} km away` : "Nearby"),
-    topArtists: toArtistObjects(m.topArtists ?? m.top_artists ?? m.spotifyTopArtists ?? m.spotify_top_artists),
-    topTracks: toTrackItems(m.topTracks ?? m.top_tracks ?? m.spotifyTopTracks ?? m.spotify_top_tracks),
-    genres: toGenres(m.genres ?? m.spotifyGenres ?? m.spotify_genres),
-    matchScore: Number(m.matchScore ?? m.score ?? m.compatibility) >= 0 ? Number(m.matchScore ?? m.score ?? m.compatibility) : 0,
-    matchBreakdown: m.matchBreakdown ?? null,
-    recentlyPlayed: toTrackItems(m.recentlyPlayed ?? []),
-    eventRsvps: m.eventRsvps ?? [],
-    currentlyPlaying: m.currentlyPlaying ?? nowPlayingMap.value[m.userId ?? m.id] ?? null,
-  }))
+  matchesStore.list.map((m, index) => {
+    const genres = toGenres(m.genres ?? m.spotifyGenres ?? m.spotify_genres);
+    const audioFeatures = toAudioFeatures(m.audioFeatures ?? m.audio_features);
+
+    return {
+      id: m.id ?? m.userId ?? `match-${index}`,
+      userId: m.userId ?? m.id ?? m.user?.id,
+      name: m.displayName ?? m.name ?? "Unknown",
+      age: Number.isFinite(Number(m.age ?? m.user?.age)) ? Number(m.age ?? m.user?.age) : null,
+      avatar: m.avatar ?? m.avatar_url ?? m.avatarUrl ?? `https://i.pravatar.cc/400?img=${(index + 10) % 70}`,
+      bio: m.bio ?? null,
+      distance: m.distance ?? (m.distanceKm != null ? `${m.distanceKm} km away` : "Nearby"),
+      topArtists: toArtistObjects(m.topArtists ?? m.top_artists ?? m.spotifyTopArtists ?? m.spotify_top_artists),
+      topTracks: toTrackItems(m.topTracks ?? m.top_tracks ?? m.spotifyTopTracks ?? m.spotify_top_tracks),
+      genres,
+      audioFeatures,
+      badges: buildMusicBadges({ genres, audioFeatures }),
+      matchScore: Number(m.matchScore ?? m.score ?? m.compatibility) >= 0 ? Number(m.matchScore ?? m.score ?? m.compatibility) : 0,
+      matchBreakdown: m.matchBreakdown ?? null,
+      recentlyPlayed: toTrackItems(m.recentlyPlayed ?? []),
+      eventRsvps: m.eventRsvps ?? [],
+      currentlyPlaying: m.currentlyPlaying ?? nowPlayingMap.value[m.userId ?? m.id] ?? null,
+    };
+  })
 );
 
 const visibleCards = computed(() =>
@@ -936,6 +974,43 @@ onUnmounted(() => {
 }
 
 /* ─── Now Playing (live) ──────────────────── */
+.music-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.music-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  backdrop-filter: blur(10px);
+}
+
+.music-badge--chill {
+  background: rgba(6,182,212,.14);
+  border-color: rgba(103,232,249,.2);
+  color: #67e8f9;
+}
+
+.music-badge--beast {
+  background: rgba(249,115,22,.14);
+  border-color: rgba(251,146,60,.24);
+  color: #fdba74;
+}
+
+.music-badge--vibe {
+  background: rgba(236,72,153,.16);
+  border-color: rgba(244,114,182,.2);
+  color: #f9a8d4;
+}
+
 .now-playing {
   display: inline-flex;
   align-items: center;

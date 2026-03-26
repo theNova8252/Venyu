@@ -1,10 +1,11 @@
 // client/src/api/index.js
 
 async function baseFetch(url, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(url, {
     credentials: 'include',
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers || {}),
     },
     ...options,
@@ -22,6 +23,20 @@ export const api = {
   // User
   async getMe() {
     return baseFetch('/api/user/me');
+  },
+
+  async updateMe(payload) {
+    return baseFetch('/api/user/me', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async uploadAvatar(formData) {
+    return baseFetch('/api/user/avatar', {
+      method: 'POST',
+      body: formData,
+    });
   },
 
   // Events

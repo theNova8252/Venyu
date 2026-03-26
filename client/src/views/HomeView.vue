@@ -27,11 +27,117 @@
               <p class="hero-subtitle">
                 Your music taste is your superpower. Let's find your people.
               </p>
+              <button
+                v-if="user.me?.bio"
+                type="button"
+                class="hero-bio"
+                @click="showBioHint = !showBioHint"
+              >
+                <q-icon name="notes" size="14px" />
+                <span>{{ user.me.bio }}</span>
+              </button>
+              <transition name="hero-pop">
+                <div v-if="showBioHint" class="hero-bio-hint">
+                  <q-icon name="info" size="15px" />
+                  <span>You can edit your bio in the Profile tab.</span>
+                </div>
+              </transition>
             </template>
 
             <div class="hero-actions">
               <q-btn to="/swipe" unelevated no-caps class="cta-primary" icon="swipe" label="Start Swiping" />
               <q-btn to="/events" flat no-caps class="cta-secondary" icon="event" label="Explore Events" />
+            </div>
+
+            <div class="hero-badges liquid-glass-inset">
+              <div class="hero-badges__head">
+                <div class="hero-badges__title-group">
+                  <span class="hero-badges__pulse"></span>
+                  <div>
+                    <div class="hero-badges__eyebrow">Music Identity</div>
+                    <div class="hero-badges__title">Your Vibe Badges</div>
+                  </div>
+                </div>
+                <q-icon name="auto_awesome" size="18px" class="hero-badges__spark" />
+              </div>
+
+              <div v-if="loadingMe" class="hero-badges__loading">
+                <q-skeleton type="text" width="40%" />
+                <div class="badge-wrap">
+                  <q-skeleton v-for="i in 3" :key="i" class="hero-badges__chip-skeleton" />
+                </div>
+              </div>
+
+              <template v-else>
+                <div v-if="myBadges.length" class="badge-wrap">
+                  <button
+                    v-for="badge in myBadges"
+                    :key="badge.id"
+                    type="button"
+                    class="music-badge hero-badge-btn"
+                    :class="[
+                      `music-badge--${badge.tone}`,
+                      { 'hero-badge-btn--active': activeBadge?.id === badge.id },
+                    ]"
+                    @click="toggleBadgeDetails(badge.id)"
+                  >
+                    {{ badge.title }}
+                  </button>
+                </div>
+
+                <transition name="hero-pop">
+                  <div v-if="activeBadge" class="badge-breakdown">
+                    <div class="badge-breakdown__head">
+                      <div>
+                        <div class="badge-breakdown__eyebrow">Badge Breakdown</div>
+                        <div class="badge-breakdown__title">{{ activeBadge.title }}</div>
+                      </div>
+                      <span class="badge-breakdown__tone" :class="`badge-breakdown__tone--${activeBadge.tone}`">
+                        {{ musicMoodDetails.label }}
+                      </span>
+                    </div>
+
+                    <p class="badge-breakdown__summary">
+                      <strong>{{ activeBadge.genre }}</strong> is your genre base. The
+                      <strong>{{ musicMoodDetails.label }}</strong> mood comes from your current danceability and energy values.
+                    </p>
+
+                    <div class="badge-breakdown__row" v-if="audioSummary.danceability != null">
+                      <span class="badge-breakdown__label">Danceability</span>
+                      <div class="badge-breakdown__bar-wrap">
+                        <div class="badge-breakdown__bar badge-breakdown__bar--dance" :style="barWidth(audioSummary.danceability)"></div>
+                      </div>
+                      <span class="badge-breakdown__value">{{ audioSummary.danceability }}%</span>
+                    </div>
+
+                    <div class="badge-breakdown__row" v-if="audioSummary.energy != null">
+                      <span class="badge-breakdown__label">Energy</span>
+                      <div class="badge-breakdown__bar-wrap">
+                        <div class="badge-breakdown__bar badge-breakdown__bar--energy" :style="barWidth(audioSummary.energy)"></div>
+                      </div>
+                      <span class="badge-breakdown__value">{{ audioSummary.energy }}%</span>
+                    </div>
+
+                    <div class="badge-breakdown__rule">{{ musicMoodDetails.rule }}</div>
+                    <div class="badge-breakdown__note">{{ musicMoodDetails.description }}</div>
+                  </div>
+                </transition>
+
+                <div v-if="audioSummary.danceability != null || audioSummary.energy != null" class="badge-stats">
+                  <div v-if="audioSummary.danceability != null" class="badge-stat">
+                    <span>Danceability</span>
+                    <strong>{{ audioSummary.danceability }}%</strong>
+                  </div>
+                  <div v-if="audioSummary.energy != null" class="badge-stat">
+                    <span>Energy</span>
+                    <strong>{{ audioSummary.energy }}%</strong>
+                  </div>
+                </div>
+
+                <div v-if="!myBadges.length" class="empty-state hero-badges__empty">
+                  Sync Spotify to generate your music badges.
+                </div>
+              </template>
             </div>
           </div>
 
@@ -93,7 +199,7 @@
             <div class="stat-label">Top Artists</div>
           </div>
           <div class="stat-pill liquid-glass-inset">
-            <div class="stat-value">{{ matches.list?.length || 0 }}</div>
+            <div class="stat-value">{{ matchRooms.length || 0 }}</div>
             <div class="stat-label">Matches</div>
           </div>
           <div class="stat-pill liquid-glass-inset">
@@ -290,25 +396,41 @@
             </div>
 
             <div v-else class="match-list">
-              <div v-for="m in matches.list" :key="m.id" class="match-row">
+              <div v-for="m in matchRooms" :key="m.roomId" class="match-row">
                 <q-avatar size="44px" class="match-avatar">
-                  <img v-if="m.avatarUrl" :src="m.avatarUrl" />
-                  <div v-else class="initials small">{{ (m.name || 'M')[0] }}</div>
+                  <img v-if="m.user.avatar" :src="m.user.avatar" />
+                  <div v-else class="initials small">{{ (m.user.name || 'M')[0] }}</div>
                 </q-avatar>
                 <div class="col">
                   <div class="match-top">
-                    <div class="match-name">{{ m.name || 'Match' }}</div>
-                    <div class="match-score">{{ m.score ?? m.matchScore ?? m.compability ?? 0 }}%</div>
+                    <div class="match-name">{{ m.user.name || 'Match' }}</div>
+                    <div class="match-status">Matched</div>
                   </div>
-                  <div class="match-detail ellipsis">
-                    {{ m.sharedArtists?.join(', ') || 'No shared artists yet' }}
+                  <div class="match-detail">
+                    {{ m.user.bio || 'Ready to chat and compare your music taste.' }}
+                  </div>
+                  <div v-if="getMatchBadges(m).length" class="match-badges">
+                    <span
+                      v-for="badge in getMatchBadges(m)"
+                      :key="badge.id"
+                      class="music-badge music-badge--compact"
+                      :class="`music-badge--${badge.tone}`"
+                    >
+                      {{ badge.title }}
+                    </span>
                   </div>
                 </div>
-                <q-btn :flat="!m.liked" :unelevated="m.liked" round :icon="m.liked ? 'favorite' : 'favorite_border'"
-                  :color="m.liked ? 'pink-6' : 'grey-6'" size="sm" :disable="m.liked" @click="matches.like(m.id)" />
+                <q-btn
+                  unelevated
+                  no-caps
+                  icon="chat_bubble"
+                  label="Chat"
+                  class="match-chat-btn"
+                  :to="{ name: 'ChatView', params: { roomId: m.roomId } }"
+                />
               </div>
 
-              <div v-if="!matches.list?.length" class="empty-state">
+              <div v-if="!matchRooms.length" class="empty-state">
                 No matches yet — go swipe a bit!
               </div>
             </div>
@@ -356,19 +478,23 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { useMatchesStore } from '@/stores/matches';
+import { useChatsStore } from '@/stores/chats';
 import { useEventsStore } from '@/stores/events';
+import { useNotificationsStore } from '@/stores/notifications';
 import { api } from '@/api';
-import axios from 'axios';
+import { buildMusicBadges, getMusicMoodDetails } from '@/services/musicBadges';
 
 const user = useUserStore();
-const matches = useMatchesStore();
+const chats = useChatsStore();
 const events = useEventsStore();
+const notifications = useNotificationsStore();
 
 const loadingMe = ref(true);
 const loadingMatches = ref(true);
 const loadingEvents = ref(true);
 const loadingRecent = ref(false);
+const showBioHint = ref(false);
+const activeBadgeId = ref(null);
 
 // Currently playing
 const currentlyPlaying = ref(null);
@@ -448,14 +574,56 @@ const lastSync = computed(() => {
   return d ? d.toLocaleString() : 'Just now';
 });
 
+const myBadges = computed(() =>
+  buildMusicBadges({
+    genres: user.me?.genres,
+    audioFeatures: user.me?.audioFeatures,
+  }));
+
+const activeBadge = computed(() =>
+  myBadges.value.find((badge) => badge.id === activeBadgeId.value) || null);
+
+const musicMoodDetails = computed(() => getMusicMoodDetails(user.me?.audioFeatures));
+
+const audioSummary = computed(() => {
+  const danceability = Number(user.me?.audioFeatures?.danceability);
+  const energy = Number(user.me?.audioFeatures?.energy);
+
+  return {
+    danceability: Number.isFinite(danceability) ? Math.round(danceability * 100) : null,
+    energy: Number.isFinite(energy) ? Math.round(energy * 100) : null,
+  };
+});
+
+const toggleBadgeDetails = (badgeId) => {
+  activeBadgeId.value = activeBadgeId.value === badgeId ? null : badgeId;
+};
+
+const barWidth = (value) => ({
+  width: `${Math.max(0, Math.min(100, Number(value) || 0))}%`,
+});
+
+const matchRooms = computed(() => chats.list);
+const getMatchBadges = (matchRoom) => buildMusicBadges(matchRoom?.user || {}, 2);
+
 const refreshAll = async () => {
   loadingMe.value = true;
   loadingMatches.value = true;
   loadingEvents.value = true;
 
-  try { await api.syncSpotifyData(); } catch (e) { console.warn('Spotify sync failed:', e); }
+  try {
+    await api.syncSpotifyData();
+    notifications.add({
+      type: 'system',
+      title: 'Spotify Synced',
+      message: 'Your music data and badges are up to date.',
+      icon: 'sync',
+    });
+  } catch (e) {
+    console.warn('Spotify sync failed:', e);
+  }
   await user.fetchMe();
-  await matches.fetchMatches();
+  await chats.fetchChats();
   await events.fetchNearby();
 
   loadingMe.value = false;
@@ -501,7 +669,7 @@ const formatPlayedAt = (dateString) => {
 
 onMounted(async () => {
   if (!user.me) await user.fetchMe();
-  if (!matches.list.length) await matches.fetchMatches();
+  if (!matchRooms.value.length) await chats.fetchChats();
   if (!events.list.length) await events.fetchNearby();
 
   loadingMe.value = false;
@@ -674,11 +842,322 @@ onUnmounted(() => {
   max-width: 480px;
 }
 
+.hero-bio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 460px;
+  margin-top: 12px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(10px);
+  appearance: none;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    background 0.18s ease;
+}
+
+.hero-bio:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.hero-bio span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-bio-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border-radius: 14px;
+  max-width: 360px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(10, 14, 25, 0.78);
+  border: 1px solid rgba(125, 211, 252, 0.14);
+  box-shadow: 0 12px 28px rgba(4, 10, 23, 0.28);
+}
+
 .hero-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 24px;
+}
+
+.hero-badges {
+  position: relative;
+  overflow: hidden;
+  margin-top: 16px;
+  padding: 14px 16px;
+  max-width: 450px;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 34px rgba(5, 8, 20, 0.22);
+  isolation: isolate;
+}
+
+.hero-badges::before {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  top: -84px;
+  right: -56px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.22) 0%, rgba(236, 72, 153, 0) 72%);
+  opacity: 0.9;
+  animation: badgeGlowDrift 9s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.hero-badges::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.06), transparent 32%),
+    linear-gradient(135deg, rgba(96, 165, 250, 0.08), rgba(168, 85, 247, 0.02) 55%, transparent 75%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.hero-badges__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hero-badges__title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hero-badges__pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7dd3fc, #f472b6);
+  box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.42);
+  animation: badgePulse 2.8s infinite;
+}
+
+.hero-badges__eyebrow {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.hero-badges__title {
+  font-size: 0.94rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.hero-badges__spark {
+  color: rgba(255, 255, 255, 0.7);
+  filter: drop-shadow(0 0 12px rgba(192, 132, 252, 0.28));
+  animation: badgeSparkFloat 5.5s ease-in-out infinite;
+}
+
+.hero-badges__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hero-badges__chip-skeleton {
+  width: 120px;
+  height: 32px;
+  border-radius: 999px;
+}
+
+.hero-badges__empty {
+  padding: 12px;
+}
+
+.hero-badges .badge-wrap {
+  gap: 8px;
+}
+
+.hero-badges .music-badge {
+  padding: 7px 12px;
+  font-size: 0.73rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.hero-badge-btn {
+  appearance: none;
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.hero-badge-btn:hover {
+  transform: translateY(-1px);
+}
+
+.hero-badge-btn--active {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(9, 14, 28, 0.22);
+}
+
+.badge-breakdown {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(12, 16, 30, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 32px rgba(4, 8, 18, 0.28);
+}
+
+.badge-breakdown__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.badge-breakdown__eyebrow {
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.badge-breakdown__title {
+  margin-top: 3px;
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.badge-breakdown__tone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.69rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge-breakdown__tone--chill {
+  color: #67e8f9;
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(103, 232, 249, 0.16);
+}
+
+.badge-breakdown__tone--beast {
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(251, 146, 60, 0.18);
+}
+
+.badge-breakdown__tone--vibe {
+  color: #f9a8d4;
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(244, 114, 182, 0.18);
+}
+
+.badge-breakdown__summary {
+  margin: 12px 0 14px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.79rem;
+  line-height: 1.55;
+}
+
+.badge-breakdown__summary strong {
+  color: #fff;
+}
+
+.badge-breakdown__row {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge-breakdown__row + .badge-breakdown__row {
+  margin-top: 10px;
+}
+
+.badge-breakdown__label {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.badge-breakdown__bar-wrap {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.badge-breakdown__bar {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.badge-breakdown__bar--dance {
+  background: linear-gradient(90deg, #38bdf8, #7dd3fc);
+}
+
+.badge-breakdown__bar--energy {
+  background: linear-gradient(90deg, #fb7185, #fdba74);
+}
+
+.badge-breakdown__value {
+  min-width: 42px;
+  text-align: right;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.badge-breakdown__rule {
+  margin-top: 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.badge-breakdown__note {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.56);
 }
 
 .cta-primary {
@@ -1091,6 +1570,117 @@ onUnmounted(() => {
   border: 1px solid rgba(139, 92, 246, 0.18);
 }
 
+.badge-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.music-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.music-badge--compact {
+  padding: 5px 10px;
+  font-size: 0.68rem;
+}
+
+.music-badge--chill {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(103, 232, 249, 0.18);
+  color: #67e8f9;
+}
+
+.music-badge--beast {
+  background: rgba(249, 115, 22, 0.14);
+  border-color: rgba(251, 146, 60, 0.22);
+  color: #fdba74;
+}
+
+.music-badge--vibe {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(244, 114, 182, 0.2);
+  color: #f9a8d4;
+}
+
+.badge-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.badge-stat {
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.badge-stat span {
+  display: inline-block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.badge-stat strong {
+  display: inline-block;
+  margin-top: 0;
+  font-size: 0.88rem;
+  color: #fff;
+}
+
+@keyframes badgePulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(125, 211, 252, 0.34);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(125, 211, 252, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(125, 211, 252, 0);
+  }
+}
+
+@keyframes badgeGlowDrift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-12px, 10px, 0) scale(1.08);
+  }
+}
+
+@keyframes badgeSparkFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.72;
+  }
+  50% {
+    transform: translateY(-4px) rotate(8deg);
+    opacity: 1;
+  }
+}
+
 /* ─── Event list ─────────────────────────────────────── */
 .event-section {
   margin-bottom: 8px;
@@ -1174,7 +1764,7 @@ onUnmounted(() => {
 
 .match-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 12px;
   border-radius: 14px;
@@ -1190,6 +1780,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .match-name {
@@ -1198,7 +1789,7 @@ onUnmounted(() => {
   color: #fff;
 }
 
-.match-score {
+.match-status {
   font-size: 0.72rem;
   font-weight: 800;
   color: #fff;
@@ -1210,6 +1801,24 @@ onUnmounted(() => {
 .match-detail {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.4);
+  margin-top: 2px;
+}
+
+.match-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.match-chat-btn {
+  align-self: center;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899) !important;
+  color: #fff !important;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0 12px;
 }
 
 /* ─── Empty state ────────────────────────────────────── */
@@ -1238,6 +1847,19 @@ onUnmounted(() => {
   }
 }
 
+.hero-pop-enter-active,
+.hero-pop-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.hero-pop-enter-from,
+.hero-pop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+}
+
 @media (max-width: 520px) {
   .home-container {
     padding: 12px 12px 32px;
@@ -1253,6 +1875,37 @@ onUnmounted(() => {
 
   .content-card {
     padding: 18px;
+  }
+
+  .hero-badges {
+    padding: 16px;
+    max-width: 100%;
+  }
+
+  .hero-bio {
+    max-width: 100%;
+  }
+
+  .hero-bio-hint {
+    max-width: 100%;
+  }
+
+  .badge-stats {
+    gap: 7px;
+  }
+
+  .badge-breakdown__head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .badge-breakdown__row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .badge-breakdown__value {
+    text-align: left;
   }
 }
 </style>

@@ -32,27 +32,12 @@ export const getMeProfile = async (req, res, next) => {
     const spotifyData = await SpotifyData.findByPk(user.id);
 
     return res.json({
-      id: user.id,
-      spotifyId: user.spotifyId,
-      displayName: user.displayName,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      birthDate: user.birthDate,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      country: user.country,
-      product: user.product,
-      bio: user.bio,
-      age: user.age,
-      isVisible: user.isVisible,
-      latitude: user.latitude,
-      longitude: user.longitude,
-
+      ...user.toJSON(),
       genres: spotifyData?.genres ?? [],
       topArtists: spotifyData?.topArtists ?? [],
       topTracks: spotifyData?.topTracks ?? [],
       recentlyPlayed: spotifyData?.recentlyPlayed ?? [],
-
+      audioFeatures: spotifyData?.audioFeatures ?? null,
       spotify: {
         id: sp.id,
         displayName: sp.display_name,
@@ -71,12 +56,23 @@ export const updateMeProfile = async (req, res, next) => {
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
     const sp = await fetchMe(at);
-    const { bio, isVisible, latitude, longitude } = req.body || {};
+    const {
+      bio,
+      isVisible,
+      is_visible: isVisibleSnake,
+      latitude,
+      longitude,
+    } = req.body || {};
+    const nextVisibility = typeof isVisible === 'boolean'
+      ? isVisible
+      : typeof isVisibleSnake === 'boolean'
+        ? isVisibleSnake
+        : undefined;
 
     const [count] = await User.update(
       {
         ...(typeof bio === 'string' ? { bio } : {}),
-        ...(typeof isVisible === 'boolean' ? { isVisible } : {}),
+        ...(typeof nextVisibility === 'boolean' ? { isVisible: nextVisibility } : {}),
         ...(typeof latitude === 'number' && typeof longitude === 'number'
           ? { latitude, longitude }
           : {}),
@@ -85,7 +81,8 @@ export const updateMeProfile = async (req, res, next) => {
     );
 
     if (!count) return res.status(404).json({ error: 'user_not_found' });
-    return res.json({ updated: true });
+    const updatedUser = await User.findOne({ where: { spotifyId: sp.id } });
+    return res.json(updatedUser?.toJSON() || { updated: true });
   } catch (e) {
     return next(e);
   }
@@ -99,10 +96,24 @@ export const uploadAvatar = async (req, res, next) => {
     const sp = await fetchMe(at);
     if (!req.file) return res.status(400).json({ error: 'no_file' });
 
+    const user = await User.findOne({ where: { spotifyId: sp.id } });
+    if (!user) return res.status(404).json({ error: 'user_not_found' });
+
+    if (typeof user.avatarUrl === 'string' && user.avatarUrl.startsWith('/uploads/')) {
+      const previousAvatarPath = path.join(process.cwd(), user.avatarUrl.replace(/^\//, ''));
+      if (fs.existsSync(previousAvatarPath)) {
+        try {
+          fs.unlinkSync(previousAvatarPath);
+        } catch (fileError) {
+          console.warn(`Failed to delete previous avatar: ${fileError.message}`);
+        }
+      }
+    }
+
     const relPath = `/uploads/${req.file.filename}`;
     await User.update({ avatarUrl: relPath }, { where: { spotifyId: sp.id } });
 
-    return res.json({ avatar_url: relPath });
+    return res.json({ avatarUrl: relPath, avatar_url: relPath });
   } catch (e) {
     return next(e);
   }

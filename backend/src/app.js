@@ -296,6 +296,7 @@ app.get('/api/matches/candidates', async (req, res, next) => {
           }))
           .filter((t) => t.name),
         genres: candidateGenres,
+        audioFeatures: uSpotify?.audioFeatures ?? null,
         eventRsvps: rsvpsByUser[u.id] || [],
         matchScore: totalScore,
         matchBreakdown: {
@@ -388,6 +389,13 @@ app.get('/api/chat/rooms', async (req, res, next) => {
       .map((m) => m.toUserId);
 
     const users = await User.findAll({ where: { id: matches } });
+    const spotifyDataRows = matches.length
+      ? await SpotifyData.findAll({ where: { userId: { [Op.in]: matches } } })
+      : [];
+    const spotifyDataByUserId = {};
+    for (const row of spotifyDataRows) {
+      spotifyDataByUserId[String(row.userId)] = row;
+    }
 
     const result = users.map((u) => ({
       roomId: [u.id, me.id].sort().join('__'),
@@ -397,8 +405,10 @@ app.get('/api/chat/rooms', async (req, res, next) => {
         age: Number.isFinite(Number(u.age)) ? Number(u.age) : null,
         avatar: u.avatarUrl || `https://i.pravatar.cc/150?u=${u.id}`,
         bio: u.bio || '',
+        genres: toArray(spotifyDataByUserId[String(u.id)]?.genres).slice(0, 6),
+        audioFeatures: spotifyDataByUserId[String(u.id)]?.audioFeatures ?? null,
       },
-    }));
+    })).sort((a, b) => a.user.name.localeCompare(b.user.name));
 
     return res.json(result);
   } catch (e) {

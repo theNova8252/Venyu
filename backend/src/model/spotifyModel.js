@@ -120,6 +120,20 @@ export async function fetchTopTracks(accessToken, { timeRange = 'medium_term', l
   const qs = new URLSearchParams({ time_range: timeRange, limit: String(limit) });
   return spotifyFetch(`${SPOTIFY_API}/me/top/tracks?${qs.toString()}`, accessToken);
 }
+
+export async function fetchAudioFeatures(accessToken, trackIds = []) {
+  const ids = Array.isArray(trackIds)
+    ? trackIds.map((id) => String(id).trim()).filter(Boolean).slice(0, 100)
+    : [];
+
+  if (!ids.length) {
+    return { audio_features: [] };
+  }
+
+  const qs = new URLSearchParams({ ids: ids.join(',') });
+  return spotifyFetch(`${SPOTIFY_API}/audio-features?${qs.toString()}`, accessToken);
+}
+
 // ================= RECENTLY PLAYED =================
 export async function fetchRecentlyPlayed(accessToken, { limit = 20 } = {}) {
   const qs = new URLSearchParams({ limit: String(limit) });
