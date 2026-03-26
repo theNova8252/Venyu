@@ -31,6 +31,8 @@ class User extends Model {
       product: values.product,
       bio: values.bio,
       age: values.age,
+      latitude: values.latitude,
+      longitude: values.longitude,
       createdAt: values.createdAt,
       updatedAt: values.updatedAt,
     };
@@ -61,6 +63,8 @@ User.init(
     bio:         { type: DataTypes.TEXT },
     age:         { type: DataTypes.INTEGER },
     isVisible:   { type: DataTypes.BOOLEAN, defaultValue: true, field: 'is_visible' },
+    latitude:    { type: DataTypes.FLOAT, allowNull: true },
+    longitude:   { type: DataTypes.FLOAT, allowNull: true },
   },
   {
     sequelize,

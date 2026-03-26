@@ -140,11 +140,23 @@
       class="heatmap-toggle"
       :class="{ active: heatmapActive }"
       @click="toggleHeatmap"
-      title="Toggle heatmap"
-      aria-label="Toggle heatmap view"
+      title="Toggle event heatmap"
+      aria-label="Toggle event heatmap view"
       :aria-pressed="heatmapActive"
     >
       <q-icon name="layers" size="20px" />
+    </button>
+
+    <!-- User activity heatmap toggle -->
+    <button
+      class="user-activity-toggle"
+      :class="{ active: userActivityActive }"
+      @click="toggleUserActivity"
+      title="Toggle user activity"
+      aria-label="Toggle user activity heatmap"
+      :aria-pressed="userActivityActive"
+    >
+      <q-icon name="group" size="20px" />
     </button>
   </q-page>
 </template>
@@ -163,6 +175,8 @@ const panelOpen = ref(false);
 const searchQuery = ref('');
 const showSearchResults = ref(false);
 const heatmapActive = ref(false);
+const userActivityActive = ref(false);
+const userActivityData = ref([]);
 const activeDate = ref('all');
 const activeGenre = ref('');
 const genreDropOpen = ref(false);
@@ -313,6 +327,34 @@ function toggleHeatmap() {
     activePopup.remove();
     activePopup = null;
   }
+}
+
+async function fetchUserActivity() {
+  try {
+    const res = await fetch('/api/user/activity-heatmap', { credentials: 'include' });
+    if (!res.ok) return;
+    userActivityData.value = await res.json();
+  } catch (e) {
+    console.error('Failed to load user activity heatmap:', e);
+  }
+}
+
+function buildUserActivityGeoJSON(data) {
+  return {
+    type: 'FeatureCollection',
+    features: data.map((pt) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [Number(pt.lng), Number(pt.lat)] },
+      properties: { weight: pt.weight },
+    })),
+  };
+}
+
+function toggleUserActivity() {
+  if (!map) return;
+  userActivityActive.value = !userActivityActive.value;
+  const vis = userActivityActive.value ? 'visible' : 'none';
+  map.setLayoutProperty('user-activity-heatmap', 'visibility', vis);
 }
 
 // Close search dropdown when clicking outside
@@ -471,7 +513,7 @@ function buildHeatGeoJSON(eventList) {
 }
 
 onMounted(async () => {
-  await events.fetchNearby();
+  await Promise.all([events.fetchNearby(), fetchUserActivity()]);
 
   const centerLng = events.userLng ?? 16.3738;
   const centerLat = events.userLat ?? 48.2082;
@@ -602,6 +644,43 @@ onMounted(async () => {
           16, 80,
         ],
         'heatmap-opacity': 0.75,
+      },
+    });
+
+    // User activity heatmap source + layer (blue/cyan, hidden by default)
+    map.addSource('user-activity', {
+      type: 'geojson',
+      data: buildUserActivityGeoJSON(userActivityData.value),
+    });
+
+    map.addLayer({
+      id: 'user-activity-heatmap',
+      type: 'heatmap',
+      source: 'user-activity',
+      layout: { visibility: 'none' },
+      paint: {
+        'heatmap-weight': ['get', 'weight'],
+        'heatmap-intensity': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 0.8,
+          12, 2.5,
+        ],
+        'heatmap-color': [
+          'interpolate', ['linear'], ['heatmap-density'],
+          0, 'rgba(0, 0, 0, 0)',
+          0.2, '#0ea5e9',
+          0.5, '#38bdf8',
+          0.8, '#22d3ee',
+          1.0, '#67e8f9',
+        ],
+        'heatmap-radius': [
+          'interpolate', ['linear'], ['zoom'],
+          0, 20,
+          6, 40,
+          12, 60,
+          16, 90,
+        ],
+        'heatmap-opacity': 0.7,
       },
     });
 
@@ -1076,6 +1155,35 @@ onUnmounted(() => {
 .heatmap-toggle.active {
   background: rgba(168, 85, 247, 0.3);
   border-color: rgba(168, 85, 247, 0.5);
+}
+
+/* ---- User activity toggle ---- */
+.user-activity-toggle {
+  position: absolute;
+  top: 160px;
+  right: 16px;
+  z-index: 12;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(10, 10, 18, 0.8);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.user-activity-toggle:hover {
+  background: rgba(14, 165, 233, 0.3);
+  border-color: rgba(14, 165, 233, 0.5);
+}
+.user-activity-toggle.active {
+  background: rgba(14, 165, 233, 0.3);
+  border-color: rgba(14, 165, 233, 0.5);
 }
 
 /* ---- Event list panel ---- */

@@ -1,6 +1,8 @@
 import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
+import { Op } from 'sequelize';
+import { sequelize } from '../model/db.js';
 import User from '../model/User.js';
 import SpotifyData from '../model/SpotifyData.js';
 import { fetchMe } from '../model/spotifyModel.js';
@@ -43,6 +45,8 @@ export const getMeProfile = async (req, res, next) => {
       bio: user.bio,
       age: user.age,
       isVisible: user.isVisible,
+      latitude: user.latitude,
+      longitude: user.longitude,
 
       genres: spotifyData?.genres ?? [],
       topArtists: spotifyData?.topArtists ?? [],
@@ -67,12 +71,15 @@ export const updateMeProfile = async (req, res, next) => {
     if (!at) return res.status(401).json({ error: 'no_access_token' });
 
     const sp = await fetchMe(at);
-    const { bio, isVisible } = req.body || {};
+    const { bio, isVisible, latitude, longitude } = req.body || {};
 
     const [count] = await User.update(
       {
         ...(typeof bio === 'string' ? { bio } : {}),
         ...(typeof isVisible === 'boolean' ? { isVisible } : {}),
+        ...(typeof latitude === 'number' && typeof longitude === 'number'
+          ? { latitude, longitude }
+          : {}),
       },
       { where: { spotifyId: sp.id } },
     );
@@ -96,6 +103,32 @@ export const uploadAvatar = async (req, res, next) => {
     await User.update({ avatarUrl: relPath }, { where: { spotifyId: sp.id } });
 
     return res.json({ avatar_url: relPath });
+  } catch (e) {
+    return next(e);
+  }
+};
+
+// Returns aggregated user locations for the activity heatmap.
+// Locations are rounded to a ~11 km grid so individual users are not identifiable.
+export const getUserActivityHeatmap = async (req, res, next) => {
+  try {
+    // Grid precision: 0.1 degree ≈ 11 km — coarse enough for privacy
+    const PRECISION = 1; // 1 decimal place
+
+    const rows = await sequelize.query(
+      `SELECT
+         ROUND(latitude::numeric,  :p) AS lat,
+         ROUND(longitude::numeric, :p) AS lng,
+         COUNT(*)::int               AS weight
+       FROM users
+       WHERE latitude  IS NOT NULL
+         AND longitude IS NOT NULL
+         AND is_visible = true
+       GROUP BY 1, 2`,
+      { replacements: { p: PRECISION }, type: sequelize.constructor.QueryTypes.SELECT },
+    );
+
+    return res.json(rows);
   } catch (e) {
     return next(e);
   }
