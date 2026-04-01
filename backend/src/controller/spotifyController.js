@@ -179,6 +179,31 @@ const summarizeAudioFeatures = (audioFeatureItems = []) => {
   };
 };
 
+const extractSpotifyErrorStatus = (error) => {
+  if (!error) return null;
+
+  const raw = typeof error?.message === 'string' ? error.message : String(error);
+
+  try {
+    const parsed = JSON.parse(raw);
+    const status = Number(parsed?.error?.status);
+    return Number.isFinite(status) ? status : null;
+  } catch {
+    return null;
+  }
+};
+
+const withSpotifyFallback = async (fn, fallbackValue, label) => {
+  try {
+    return await fn();
+  } catch (error) {
+    const status = extractSpotifyErrorStatus(error);
+    const suffix = Number.isFinite(status) ? ` (status ${status})` : '';
+    console.warn(`Spotify optional fetch failed: ${label}${suffix}`);
+    return fallbackValue;
+  }
+};
+
 // ======================= LOGIN =======================
 export const login = (req, res) => {
   const state = typeof req.query.state === 'string' ? req.query.state : '';
@@ -221,11 +246,24 @@ export const callback = async (req, res) => {
 
     const tokens = await exchangeCodeForTokens(code);
 
-    const [meProfile, topArtistsRes, topTracksRes, recentlyPlayedRes] = await Promise.all([
-      fetchMe(tokens.access_token),
-      fetchTopArtists(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
-      fetchTopTracks(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
-      fetchRecentlyPlayed(tokens.access_token, { limit: 20 }),
+    const meProfile = await fetchMe(tokens.access_token);
+
+    const [topArtistsRes, topTracksRes, recentlyPlayedRes] = await Promise.all([
+      withSpotifyFallback(
+        () => fetchTopArtists(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
+        { items: [] },
+        'top_artists',
+      ),
+      withSpotifyFallback(
+        () => fetchTopTracks(tokens.access_token, { timeRange: 'medium_term', limit: 20 }),
+        { items: [] },
+        'top_tracks',
+      ),
+      withSpotifyFallback(
+        () => fetchRecentlyPlayed(tokens.access_token, { limit: 20 }),
+        { items: [] },
+        'recently_played',
+      ),
     ]);
 
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
@@ -264,7 +302,11 @@ export const callback = async (req, res) => {
       .filter(Boolean)
       .slice(0, 10);
     const audioFeaturesRes = topTrackIds.length
-      ? await fetchAudioFeatures(tokens.access_token, topTrackIds)
+      ? await withSpotifyFallback(
+        () => fetchAudioFeatures(tokens.access_token, topTrackIds),
+        { audio_features: [] },
+        'audio_features',
+      )
       : { audio_features: [] };
     const audioFeatures = summarizeAudioFeatures(audioFeaturesRes?.audio_features || []);
 
