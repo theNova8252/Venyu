@@ -26,11 +26,15 @@ ChatMessage.init(
     },
     ciphertext: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
     },
     iv: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
+    },
+    plaintext: {
+      type: DataTypes.TEXT,
+      allowNull: true,
     },
     version: {
       type: DataTypes.STRING,

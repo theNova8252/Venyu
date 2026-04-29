@@ -81,6 +81,42 @@ export const api = {
     });
   },
 
+  async searchSpotifyTracks(query, limit = 8) {
+    return baseFetch(`/api/spotify/search-tracks?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+  },
+
+  async getSpotifyPlayerToken() {
+    return baseFetch('/api/spotify/player/token');
+  },
+
+  async refreshSpotifyAuth() {
+    return baseFetch('/api/spotify/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  },
+
+  async playSpotifyTrack(trackUri, positionMs = 0, deviceId = null) {
+    return baseFetch('/api/spotify/player/play', {
+      method: 'POST',
+      body: JSON.stringify({ trackUri, positionMs, deviceId }),
+    });
+  },
+
+  async pauseSpotifyTrack(deviceId = null) {
+    return baseFetch('/api/spotify/player/pause', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId }),
+    });
+  },
+
+  async seekSpotifyTrack(positionMs, deviceId = null) {
+    return baseFetch('/api/spotify/player/seek', {
+      method: 'POST',
+      body: JSON.stringify({ positionMs, deviceId }),
+    });
+  },
+
   // Search
   async search(query, type = 'all') {
     return baseFetch(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
@@ -96,11 +132,15 @@ export const api = {
   },
 
   // E2EE
-  async upsertMyPublicKey(publicKeyJwk) {
+  async upsertMyPublicKey(publicKeyJwk, privateKeyBackup = null) {
     return baseFetch('/api/chat/e2ee/public-key', {
       method: 'POST',
-      body: JSON.stringify({ publicKeyJwk }),
+      body: JSON.stringify({ publicKeyJwk, privateKeyBackup }),
     });
+  },
+
+  async getMyKeyBundle() {
+    return baseFetch('/api/chat/e2ee/my-key');
   },
 
   async getPeerPublicKey(roomId) {

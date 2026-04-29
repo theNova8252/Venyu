@@ -426,28 +426,47 @@ app.use(errorHandler);
 const PORT = Number(process.env.PORT) || 5000;
 
 // ---- WebSocket Raumverwaltung ----
-const rooms = new Map(); // roomId -> Set<WebSocket>
+const rooms = new Map(); // roomId -> { chat: Set<WebSocket>, spotify: Set<WebSocket> }
 const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
 const lastSeenAt = new Map(); // userId -> ISO timestamp (letztes offline)
+const roomSongStates = new Map(); // roomId -> current song state
+const roomSongReadyUsers = new Map(); // roomId -> Set<userId>
+const BOTH_ONLINE_REQUIRED_MESSAGE = 'Beide muessen online sein, um gemeinsam zu hoeren.';
 
-function addClientToRoom(roomId, ws) {
-  let set = rooms.get(roomId);
-  if (!set) {
-    set = new Set();
-    rooms.set(roomId, set);
+function getRoomEntry(roomId) {
+  let entry = rooms.get(roomId);
+  if (!entry) {
+    entry = {
+      chat: new Set(),
+      spotify: new Set(),
+    };
+    rooms.set(roomId, entry);
   }
-  set.add(ws);
+  return entry;
 }
 
-function removeClientFromRoom(roomId, ws) {
-  const set = rooms.get(roomId);
-  if (!set) return;
-  set.delete(ws);
-  if (!set.size) rooms.delete(roomId);
+function getRoomSet(roomId, channel = 'chat') {
+  const entry = rooms.get(roomId);
+  return entry?.[channel] || null;
 }
 
-function broadcastToRoom(roomId, payload) {
-  const set = rooms.get(roomId);
+function addClientToRoom(roomId, ws, channel = 'chat') {
+  const entry = getRoomEntry(roomId);
+  entry[channel].add(ws);
+}
+
+function removeClientFromRoom(roomId, ws, channel = 'chat') {
+  const entry = rooms.get(roomId);
+  if (!entry?.[channel]) return;
+
+  entry[channel].delete(ws);
+  if (!entry.chat.size && !entry.spotify.size) {
+    rooms.delete(roomId);
+  }
+}
+
+function broadcastToRoom(roomId, payload, channel = 'chat') {
+  const set = getRoomSet(roomId, channel);
   if (!set) return;
 
   const json = JSON.stringify(payload);
@@ -458,8 +477,8 @@ function broadcastToRoom(roomId, payload) {
   }
 }
 
-function broadcastToRoomExcept(roomId, payload, exceptWs) {
-  const set = rooms.get(roomId);
+function broadcastToRoomExcept(roomId, payload, exceptWs, channel = 'chat') {
+  const set = getRoomSet(roomId, channel);
   if (!set) return;
 
   const json = JSON.stringify(payload);
@@ -468,6 +487,160 @@ function broadcastToRoomExcept(roomId, payload, exceptWs) {
       client.send(json);
     }
   }
+}
+
+function getRoomParticipantIds(roomId) {
+  return String(roomId)
+    .split('__')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function areAllRoomParticipantsOnline(roomId) {
+  const participantIds = getRoomParticipantIds(roomId);
+  return participantIds.length > 1
+    && participantIds.every((participantId) => (onlineUsers.get(String(participantId)) || 0) > 0);
+}
+
+function getRoomSongReadySet(roomId) {
+  let readySet = roomSongReadyUsers.get(roomId);
+  if (!readySet) {
+    readySet = new Set();
+    roomSongReadyUsers.set(roomId, readySet);
+  }
+  return readySet;
+}
+
+function getRoomSongReadyIds(roomId) {
+  const readySet = roomSongReadyUsers.get(roomId);
+  return readySet ? Array.from(readySet).map(String) : [];
+}
+
+function resetRoomSongReady(roomId) {
+  roomSongReadyUsers.delete(roomId);
+}
+
+function clampSongPosition(songState, positionMs) {
+  const durationMs = Number(songState?.durationMs) || 0;
+  const safePosition = Math.max(0, Number(positionMs) || 0);
+
+  if (durationMs > 0) {
+    return Math.min(safePosition, durationMs);
+  }
+
+  return safePosition;
+}
+
+function normalizeSongStartPosition(songState, positionMs) {
+  const durationMs = Number(songState?.durationMs) || 0;
+  const safePosition = clampSongPosition(songState, positionMs);
+  if (durationMs > 0 && safePosition >= durationMs) {
+    return 0;
+  }
+  return safePosition;
+}
+
+function getCurrentSongPosition(songState, serverNow = Date.now()) {
+  if (!songState) return 0;
+
+  const basePosition = clampSongPosition(songState, songState.positionMs);
+  if (!songState.isPlaying || !Number.isFinite(Number(songState.startedAtServerTime))) {
+    return basePosition;
+  }
+
+  const deltaMs = Math.max(0, serverNow - Number(songState.startedAtServerTime));
+  return clampSongPosition(songState, basePosition + deltaMs);
+}
+
+function buildSongState(roomId, payload, userId, previousState = null) {
+  let artists = [];
+  if (Array.isArray(payload?.artists)) {
+    artists = payload.artists.map((artist) => String(artist).trim()).filter(Boolean);
+  } else if (Array.isArray(previousState?.artists)) {
+    artists = previousState.artists;
+  }
+
+  const nextState = {
+    chatId: roomId,
+    trackUri: payload?.trackUri ?? previousState?.trackUri ?? null,
+    trackName: payload?.trackName ?? previousState?.trackName ?? null,
+    artists,
+    albumImage: payload?.albumImage ?? previousState?.albumImage ?? null,
+    durationMs: Number(payload?.durationMs ?? previousState?.durationMs) || 0,
+    isPlaying: Boolean(payload?.isPlaying ?? previousState?.isPlaying ?? false),
+    startedAtServerTime: payload?.startedAtServerTime ?? previousState?.startedAtServerTime ?? null,
+    positionMs: Math.max(0, Number(payload?.positionMs ?? previousState?.positionMs) || 0),
+    selectedByUserId: String(
+      payload?.selectedByUserId ?? previousState?.selectedByUserId ?? userId,
+    ),
+  };
+
+  nextState.positionMs = clampSongPosition(nextState, nextState.positionMs);
+  return nextState;
+}
+
+function setRoomSongState(
+  roomId,
+  payload,
+  userId,
+  previousState = roomSongStates.get(roomId) || null,
+) {
+  const nextState = buildSongState(roomId, payload, userId, previousState);
+  roomSongStates.set(roomId, nextState);
+  return nextState;
+}
+
+function buildSongPayload(type, roomId, extra = {}) {
+  return {
+    type,
+    state: roomSongStates.get(roomId) || null,
+    readyUserIds: getRoomSongReadyIds(roomId),
+    serverNow: Date.now(),
+    ...extra,
+  };
+}
+
+function sendSongSyncToClient(ws, roomId) {
+  if (ws.readyState !== ws.OPEN) return;
+  ws.send(JSON.stringify(buildSongPayload('song:sync', roomId)));
+}
+
+function sendSongError(ws, roomId, message, code = 'both_online_required') {
+  if (ws.readyState !== ws.OPEN) return;
+  ws.send(JSON.stringify(buildSongPayload('song:error', roomId, { message, code })));
+}
+
+function broadcastSongEvent(roomId, type, extra = {}) {
+  broadcastToRoom(roomId, buildSongPayload(type, roomId, extra), 'chat');
+}
+
+function scheduleRoomSongStart(roomId, {
+  countdownMs = 3000,
+  positionMs = null,
+  initiatedByUserId = null,
+  eventType = 'song:start',
+} = {}) {
+  const currentState = roomSongStates.get(roomId);
+  if (!currentState?.trackUri) return null;
+
+  const serverNow = Date.now();
+  const nextPosition = normalizeSongStartPosition(
+    currentState,
+    positionMs == null ? getCurrentSongPosition(currentState, serverNow) : positionMs,
+  );
+
+  const nextState = setRoomSongState(roomId, {
+    isPlaying: true,
+    startedAtServerTime: serverNow + Number(countdownMs || 0),
+    positionMs: nextPosition,
+  }, initiatedByUserId || currentState.selectedByUserId, currentState);
+
+  broadcastSongEvent(roomId, eventType, {
+    countdownMs: Number(countdownMs || 0),
+    initiatedByUserId: initiatedByUserId ? String(initiatedByUserId) : null,
+  });
+
+  return nextState;
 }
 
 function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
@@ -524,8 +697,9 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
           // eslint-disable-next-line no-param-reassign
           ws.roomId = roomId;
 
-          addClientToRoom(roomId, ws);
+          addClientToRoom(roomId, ws, 'chat');
           console.log(`WS connected (chat): user ${user.id} room ${roomId}`);
+          sendSongSyncToClient(ws, roomId);
 
           ws.on('message', async (data) => {
             try {
@@ -560,6 +734,144 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
               }
 
               // ✅ read receipt (vereinheitlicht auf lastReadMessageId)
+              if (msg.type === 'song:sync') {
+                sendSongSyncToClient(ws, roomId);
+                return;
+              }
+
+              if (msg.type === 'song:select') {
+                const trackUri = typeof msg.trackUri === 'string' ? msg.trackUri.trim() : '';
+                if (!trackUri) return;
+                if (!areAllRoomParticipantsOnline(roomId)) {
+                  sendSongError(ws, roomId, BOTH_ONLINE_REQUIRED_MESSAGE);
+                  return;
+                }
+
+                resetRoomSongReady(roomId);
+                setRoomSongState(roomId, {
+                  trackUri,
+                  trackName: typeof msg.trackName === 'string' ? msg.trackName.trim() : null,
+                  artists: Array.isArray(msg.artists) ? msg.artists : [],
+                  albumImage: typeof msg.albumImage === 'string' ? msg.albumImage : null,
+                  durationMs: Number(msg.durationMs) || 0,
+                  isPlaying: false,
+                  startedAtServerTime: null,
+                  positionMs: 0,
+                  selectedByUserId: String(ws.userId),
+                }, ws.userId, null);
+
+                broadcastSongEvent(roomId, 'song:select', {
+                  selectedByUserId: String(ws.userId),
+                });
+                return;
+              }
+
+              if (msg.type === 'song:ready') {
+                const currentSong = roomSongStates.get(roomId);
+                if (!currentSong?.trackUri) return;
+                if (msg.trackUri && String(msg.trackUri) !== String(currentSong.trackUri)) return;
+                if (!areAllRoomParticipantsOnline(roomId)) {
+                  sendSongError(ws, roomId, BOTH_ONLINE_REQUIRED_MESSAGE);
+                  return;
+                }
+
+                const readySet = getRoomSongReadySet(roomId);
+                readySet.add(String(ws.userId));
+
+                broadcastSongEvent(roomId, 'song:ready', {
+                  readyUserId: String(ws.userId),
+                });
+
+                const participantIds = getRoomParticipantIds(roomId);
+                const everyoneReady = participantIds.length > 0
+                  && participantIds.every((participantId) => readySet.has(String(participantId)));
+
+                if (everyoneReady && !currentSong.isPlaying) {
+                  scheduleRoomSongStart(roomId, {
+                    countdownMs: 3000,
+                    positionMs: currentSong.positionMs ?? 0,
+                    initiatedByUserId: ws.userId,
+                    eventType: 'song:start',
+                  });
+                }
+                return;
+              }
+
+              if (msg.type === 'song:pause') {
+                const currentSong = roomSongStates.get(roomId);
+                if (!currentSong?.trackUri) return;
+
+                const pausedPosition = clampSongPosition(
+                  currentSong,
+                  msg.positionMs == null ? getCurrentSongPosition(currentSong) : msg.positionMs,
+                );
+
+                setRoomSongState(roomId, {
+                  isPlaying: false,
+                  startedAtServerTime: null,
+                  positionMs: pausedPosition,
+                }, ws.userId, currentSong);
+
+                broadcastSongEvent(roomId, 'song:pause', {
+                  initiatedByUserId: String(ws.userId),
+                });
+                return;
+              }
+
+              if (msg.type === 'song:resume') {
+                const currentSong = roomSongStates.get(roomId);
+                if (!currentSong?.trackUri) return;
+                if (!areAllRoomParticipantsOnline(roomId)) {
+                  sendSongError(ws, roomId, BOTH_ONLINE_REQUIRED_MESSAGE);
+                  return;
+                }
+
+                scheduleRoomSongStart(roomId, {
+                  countdownMs: 1500,
+                  positionMs: msg.positionMs ?? currentSong.positionMs,
+                  initiatedByUserId: ws.userId,
+                  eventType: 'song:resume',
+                });
+                return;
+              }
+
+              if (msg.type === 'song:seek') {
+                const currentSong = roomSongStates.get(roomId);
+                if (!currentSong?.trackUri) return;
+                if (!areAllRoomParticipantsOnline(roomId)) {
+                  sendSongError(ws, roomId, BOTH_ONLINE_REQUIRED_MESSAGE);
+                  return;
+                }
+
+                const targetPosition = clampSongPosition(
+                  currentSong,
+                  msg.positionMs == null ? currentSong.positionMs : msg.positionMs,
+                );
+                const shouldKeepPlaying = typeof msg.isPlaying === 'boolean'
+                  ? msg.isPlaying
+                  : currentSong.isPlaying;
+
+                if (shouldKeepPlaying) {
+                  scheduleRoomSongStart(roomId, {
+                    countdownMs: 1000,
+                    positionMs: targetPosition,
+                    initiatedByUserId: ws.userId,
+                    eventType: 'song:seek',
+                  });
+                } else {
+                  setRoomSongState(roomId, {
+                    isPlaying: false,
+                    startedAtServerTime: null,
+                    positionMs: targetPosition,
+                  }, ws.userId, currentSong);
+
+                  broadcastSongEvent(roomId, 'song:seek', {
+                    initiatedByUserId: String(ws.userId),
+                  });
+                }
+                return;
+              }
+
               if (msg.type === 'read') {
                 const { lastReadMessageId } = msg;
                 if (!lastReadMessageId) return;
@@ -600,6 +912,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
                   senderId: String(ws.userId),
                   ciphertext,
                   iv,
+                  plaintext: null,
                   version: version || 'aes-gcm-v1',
                   readAt: null,
                   readBy: null,
@@ -617,7 +930,20 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
 
           ws.on('close', () => {
             console.log(`WS closed (chat): user ${ws.userId} room ${ws.roomId}`);
-            removeClientFromRoom(ws.roomId, ws);
+            removeClientFromRoom(ws.roomId, ws, 'chat');
+
+            const readySet = roomSongReadyUsers.get(ws.roomId);
+            if (readySet) {
+              readySet.delete(String(ws.userId));
+              if (!readySet.size) {
+                roomSongReadyUsers.delete(ws.roomId);
+              } else {
+                const currentSong = roomSongStates.get(ws.roomId);
+                if (currentSong && !currentSong.isPlaying) {
+                  broadcastSongEvent(ws.roomId, 'song:sync');
+                }
+              }
+            }
           });
 
           return;
@@ -650,7 +976,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
           // eslint-disable-next-line no-param-reassign
           ws.roomId = roomId;
 
-          addClientToRoom(roomId, ws);
+          addClientToRoom(roomId, ws, 'spotify');
           console.log(`WS connected (spotify): user ${user.id} room ${roomId}`);
 
           ws.on('message', (data) => {
@@ -681,7 +1007,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
                   trackUri,
                   startAt,
                   hostId: ws.userId,
-                });
+                }, 'spotify');
               }
             } catch (e) {
               console.error('WS spotify error', e);
@@ -690,7 +1016,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
 
           ws.on('close', () => {
             console.log(`WS closed (spotify): user ${ws.userId} room ${ws.roomId}`);
-            removeClientFromRoom(ws.roomId, ws);
+            removeClientFromRoom(ws.roomId, ws, 'spotify');
           });
 
           return;

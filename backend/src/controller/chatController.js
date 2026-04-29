@@ -33,22 +33,22 @@ export async function listMessages(req, res, next) {
       order: [['createdAt', 'ASC']],
     });
 
-    const result = messages.map((m) => {
-      const obj = m.toJSON();
+    const result = messages.map((message) => {
+      const obj = message.toJSON();
       obj.isMine = String(obj.senderId) === String(currentUser.id);
       return obj;
     });
 
     return res.json(result);
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    return next(err);
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    return next(error);
   }
 }
 
 export async function createMessage(req, res, next) {
   const { roomId } = req.params;
-  const { ciphertext, iv, version } = req.body;
+  const { ciphertext, iv, version } = req.body || {};
 
   if (!ciphertext || !iv) {
     return res.status(400).json({ message: 'ciphertext and iv are required' });
@@ -57,19 +57,20 @@ export async function createMessage(req, res, next) {
   try {
     const currentUser = await getCurrentUser(req);
 
-    const msg = await ChatMessage.create({
+    const message = await ChatMessage.create({
       roomId,
       senderId: currentUser.id,
       ciphertext,
       iv,
+      plaintext: null,
       version: version || 'aes-gcm-v1',
     });
 
-    const obj = msg.toJSON();
+    const obj = message.toJSON();
     obj.isMine = true;
     return res.status(201).json(obj);
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    return next(err);
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    return next(error);
   }
 }

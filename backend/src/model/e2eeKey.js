@@ -20,6 +20,26 @@ E2eeKey.init(
       allowNull: false,
       field: 'public_key_jwk',
     },
+    privateKeyBackupCiphertext: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'private_key_backup_ciphertext',
+    },
+    privateKeyBackupIv: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'private_key_backup_iv',
+    },
+    privateKeyBackupSalt: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'private_key_backup_salt',
+    },
+    privateKeyBackupVersion: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'private_key_backup_version',
+    },
   },
   {
     sequelize,

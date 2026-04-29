@@ -11,7 +11,10 @@ import {
   fetchRecentlyPlayed,
   fetchCurrentlyPlaying,
   fetchDevices,
+  searchTracks as searchSpotifyTracks,
   startPlayback,
+  pausePlayback,
+  seekPlayback,
 } from '../model/spotifyModel.js';
 import User from '../model/User.js';
 import SpotifyToken from '../model/SpotifyToken.js';
@@ -204,6 +207,61 @@ const withSpotifyFallback = async (fn, fallbackValue, label) => {
   }
 };
 
+const PREMIUM_REQUIRED_HINT = 'Spotify Premium oder ein aktives Spotify-Gerät wird benötigt.';
+const DEVICE_REQUIRED_HINT = 'Öffne Spotify (Handy/Desktop) und starte kurz einen Song, dann nochmal.';
+
+const requireAccessToken = (req) => {
+  const { at } = req.cookies || {};
+  if (!at) {
+    const error = new Error('no_access_token');
+    error.status = 401;
+    throw error;
+  }
+  return at;
+};
+
+const buildTrackSearchResult = (track) => ({
+  trackId: track?.id ?? null,
+  uri: track?.uri ?? null,
+  name: track?.name ?? null,
+  artists: Array.isArray(track?.artists)
+    ? track.artists.map((artist) => artist?.name).filter(Boolean)
+    : [],
+  albumImage: track?.album?.images?.[0]?.url ?? null,
+  durationMs: Number(track?.duration_ms) || 0,
+});
+
+const createNoDeviceError = () => {
+  const error = new Error('no_device_available');
+  error.status = 409;
+  error.hint = DEVICE_REQUIRED_HINT;
+  return error;
+};
+
+const resolvePlaybackDevice = async (accessToken, preferredDeviceId = null) => {
+  if (preferredDeviceId) return preferredDeviceId;
+
+  const devs = await fetchDevices(accessToken);
+  const active = devs?.devices?.find((device) => device.is_active);
+  const fallback = active?.id || devs?.devices?.[0]?.id || null;
+
+  if (!fallback) {
+    throw createNoDeviceError();
+  }
+
+  return fallback;
+};
+
+const sendPlaybackError = (res, error, fallbackErrorCode) => {
+  const spotifyStatus = extractSpotifyErrorStatus(error);
+  const status = error?.status || spotifyStatus || 500;
+
+  return res.status(status).json({
+    error: error?.message || fallbackErrorCode,
+    hint: status === 403 ? PREMIUM_REQUIRED_HINT : (error?.hint || PREMIUM_REQUIRED_HINT),
+  });
+};
+
 // ======================= LOGIN =======================
 export const login = (req, res) => {
   const state = typeof req.query.state === 'string' ? req.query.state : '';
@@ -294,7 +352,7 @@ export const callback = async (req, res) => {
         id: a.id,
         name: a.name,
         uri: a.uri,
-        })),
+      })),
     }));
 
     const topTrackIds = (topTracksRes?.items || [])
@@ -414,10 +472,9 @@ export const callback = async (req, res) => {
 // ======================= ME ==========================
 export const me = async (req, res, next) => {
   try {
-    const { at } = req.cookies || {};
-    if (!at) return res.status(401).json({ error: 'no_access_token' });
+    const accessToken = requireAccessToken(req);
 
-    const profile = await fetchMe(at);
+    const profile = await fetchMe(accessToken);
     const user = await User.findOne({ where: { spotifyId: profile.id } });
     if (!user) return res.status(404).json({ error: 'user_not_found' });
 
@@ -505,13 +562,49 @@ export const logout = async (_req, res, next) => {
   }
 };
 
+// ======================= TRACK SEARCH =================
+export const searchTracks = async (req, res, next) => {
+  try {
+    const accessToken = requireAccessToken(req);
+    const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 20);
+
+    if (query.length < 2) {
+      return res.json([]);
+    }
+
+    const data = await searchSpotifyTracks(accessToken, query, { limit });
+    const tracks = Array.isArray(data?.tracks?.items)
+      ? data.tracks.items.map(buildTrackSearchResult).filter((track) => track.trackId && track.uri)
+      : [];
+
+    return res.json(tracks);
+  } catch (e) {
+    if (e.status) {
+      return res.status(e.status).json({ error: e.message });
+    }
+
+    return next(e);
+  }
+};
+
+export const playerToken = async (req, res, next) => {
+  try {
+    const accessToken = requireAccessToken(req);
+    return res.json({ accessToken });
+  } catch (e) {
+    if (e.status) {
+      return res.status(e.status).json({ error: e.message });
+    }
+
+    return next(e);
+  }
+};
+
 // ======================= CURRENTLY PLAYING ===========
 export const currentlyPlaying = async (req, res, _next) => {
   try {
-    const { at } = req.cookies || {};
-    if (!at) return res.status(401).json({ error: 'no_access_token' });
-
-    let accessToken = at;
+    let accessToken = requireAccessToken(req);
 
     // If userId is provided, look up that user's token instead
     const { userId } = req.query || {};
@@ -548,27 +641,25 @@ export const currentlyPlaying = async (req, res, _next) => {
 // ======================= DEVICES =====================
 export const devices = async (req, res) => {
   try {
-    const { at } = req.cookies || {};
-    if (!at) return res.status(401).json({ error: 'no_access_token' });
-
-    const data = await fetchDevices(at);
+    const accessToken = requireAccessToken(req);
+    const data = await fetchDevices(accessToken);
     return res.json(data);
   } catch (e) {
     console.error('devices error:', e?.message || e);
-    return res.status(500).json({ error: e?.message || 'devices_failed' });
+    return res.status(e?.status || 500).json({ error: e?.message || 'devices_failed' });
   }
 };
 
 // ======================= PLAY ========================
 export const play = async (req, res) => {
   try {
-    const { at } = req.cookies || {};
-    if (!at) return res.status(401).json({ error: 'no_access_token' });
+    const accessToken = requireAccessToken(req);
 
     const { trackUri, deviceId, positionMs } = req.body || {};
     if (!trackUri) return res.status(400).json({ error: 'missing_trackUri' });
 
-    let finalDeviceId = deviceId || null;
+    const at = accessToken;
+    let finalDeviceId = await resolvePlaybackDevice(accessToken, deviceId || null);
 
     if (!finalDeviceId) {
       const devs = await fetchDevices(at);
@@ -583,7 +674,7 @@ export const play = async (req, res) => {
       }
     }
 
-    await startPlayback(at, {
+    await startPlayback(accessToken, {
       deviceId: finalDeviceId,
       uris: [trackUri],
       positionMs: positionMs ?? 0,
@@ -592,10 +683,41 @@ export const play = async (req, res) => {
     return res.json({ ok: true, deviceId: finalDeviceId });
   } catch (e) {
     console.error('play error:', e?.message || e);
-    return res.status(500).json({
-      error: e?.message || 'play_failed',
-      hint: 'Wenn 403: oft Premium/Scopes/Token.',
+    return sendPlaybackError(res, e, 'play_failed');
+  }
+};
+
+// ======================= PAUSE =======================
+export const pause = async (req, res) => {
+  try {
+    const accessToken = requireAccessToken(req);
+    const { deviceId } = req.body || {};
+    const finalDeviceId = await resolvePlaybackDevice(accessToken, deviceId || null);
+
+    await pausePlayback(accessToken, { deviceId: finalDeviceId });
+    return res.json({ ok: true, deviceId: finalDeviceId });
+  } catch (e) {
+    console.error('pause error:', e?.message || e);
+    return sendPlaybackError(res, e, 'pause_failed');
+  }
+};
+
+// ======================= SEEK ========================
+export const seek = async (req, res) => {
+  try {
+    const accessToken = requireAccessToken(req);
+    const { positionMs, deviceId } = req.body || {};
+    const finalDeviceId = await resolvePlaybackDevice(accessToken, deviceId || null);
+
+    await seekPlayback(accessToken, positionMs ?? 0, { deviceId: finalDeviceId });
+    return res.json({
+      ok: true,
+      deviceId: finalDeviceId,
+      positionMs: Math.max(0, Number(positionMs) || 0),
     });
+  } catch (e) {
+    console.error('seek error:', e?.message || e);
+    return sendPlaybackError(res, e, 'seek_failed');
   }
 };
 
@@ -645,7 +767,7 @@ export const syncMusicData = async (req, res, next) => {
         id: a.id,
         name: a.name,
         uri: a.uri,
-        })),
+      })),
     }));
 
     const topTrackIds = (topTracksRes?.items || [])

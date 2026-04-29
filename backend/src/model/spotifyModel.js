@@ -145,6 +145,20 @@ export async function fetchCurrentlyPlaying(accessToken) {
 }
 
 // ================= DEVICES / PLAYBACK =================
+export async function searchTracks(accessToken, query, { limit = 10 } = {}) {
+  const normalizedQuery = typeof query === 'string' ? query.trim() : '';
+  if (!normalizedQuery) {
+    return { tracks: { items: [] } };
+  }
+
+  const qs = new URLSearchParams({
+    q: normalizedQuery,
+    type: 'track',
+    limit: String(limit),
+  });
+  return spotifyFetch(`${SPOTIFY_API}/search?${qs.toString()}`, accessToken);
+}
+
 export async function fetchDevices(accessToken) {
   return spotifyFetch(`${SPOTIFY_API}/me/player/devices`, accessToken);
 }
@@ -164,6 +178,34 @@ export async function startPlayback(
       uris,
       position_ms: positionMs,
     }),
+  });
+
+  return { ok: true };
+}
+
+export async function pausePlayback(accessToken, { deviceId = null } = {}) {
+  const url = deviceId
+    ? `${SPOTIFY_API}/me/player/pause?device_id=${encodeURIComponent(deviceId)}`
+    : `${SPOTIFY_API}/me/player/pause`;
+
+  await spotifyFetch(url, accessToken, {
+    method: 'PUT',
+  });
+
+  return { ok: true };
+}
+
+export async function seekPlayback(accessToken, positionMs, { deviceId = null } = {}) {
+  const params = new URLSearchParams({
+    position_ms: String(Math.max(0, Number(positionMs) || 0)),
+  });
+
+  if (deviceId) {
+    params.set('device_id', deviceId);
+  }
+
+  await spotifyFetch(`${SPOTIFY_API}/me/player/seek?${params.toString()}`, accessToken, {
+    method: 'PUT',
   });
 
   return { ok: true };
