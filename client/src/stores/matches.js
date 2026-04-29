@@ -61,10 +61,10 @@ export const useMatchesStore = defineStore('matches', {
     async like(otherUserId) {
       this.error = null;
       try {
-        // ✅ Persistiert Like im Backend + gibt {isMatch, roomId} zurück
+        // Persist the like in the backend and return { isMatch, roomId }.
         const res = await api.likeUser(otherUserId);
 
-        // UI-Status updaten (optional)
+        // Update UI state.
         const m = this.list.find((x) => x.id === otherUserId || x.userId === otherUserId);
         if (m) m.liked = true;
 

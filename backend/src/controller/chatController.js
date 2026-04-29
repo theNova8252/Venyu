@@ -36,6 +36,7 @@ export async function listMessages(req, res, next) {
     const result = messages.map((message) => {
       const obj = message.toJSON();
       obj.isMine = String(obj.senderId) === String(currentUser.id);
+      obj.plaintext = null;
       return obj;
     });
 
@@ -68,6 +69,7 @@ export async function createMessage(req, res, next) {
 
     const obj = message.toJSON();
     obj.isMine = true;
+    obj.plaintext = null;
     return res.status(201).json(obj);
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });

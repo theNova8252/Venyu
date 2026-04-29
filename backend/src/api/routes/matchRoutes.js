@@ -31,20 +31,19 @@ function makeRoomId(a, b) {
   return [a, b].sort().join('__');
 }
 
-// Kandidaten (mit Filter: keine bereits gelikten / gematchten)
+// Candidates, excluding already liked or matched users.
 router.get('/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
 
-    // 1) Alle Leute die ich schon geliked habe (diese sollen NICHT wieder auftauchen)
+    // 1) All people I already liked should not show up again.
     const myLikes = await Like.findAll({
       where: { fromUserId: me.id },
       attributes: ['toUserId'],
     });
     const likedIds = new Set(myLikes.map((l) => String(l.toUserId)));
 
-    // 2) Optional: Matches bestimmen (mutual likes)
-    //    (eigentlich sind Matches eh subset von likedIds, aber wir lassen’s sauber drin)
+    // 2) Determine mutual-like matches.
     const reciprocalLikes = await Like.findAll({
       where: {
         toUserId: me.id,
@@ -54,10 +53,10 @@ router.get('/candidates', async (req, res, next) => {
     });
     const matchedIds = new Set(reciprocalLikes.map((l) => String(l.fromUserId)));
 
-    // 3) Kandidaten holen, aber:
+    // 3) Fetch candidates, excluding:
     //    - nicht ich
     //    - sichtbar
-    //    - nicht schon geliked
+    //    - already liked users
     //    - nicht gematched
     const others = await User.findAll({
       where: {
@@ -198,7 +197,7 @@ router.post('/:otherUserId/like', async (req, res, next) => {
     const other = await User.findByPk(otherUserId);
     if (!other) return res.status(404).json({ error: 'user_not_found' });
 
-    // ✅ schützt gegen doppelte Likes
+    // Prevent duplicate likes.
     await Like.findOrCreate({
       where: {
         fromUserId: me.id,

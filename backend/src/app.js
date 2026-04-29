@@ -20,7 +20,7 @@ import eventRsvpRoutes from './api/routes/eventRSVProutes.js';
 import searchRoutes from './api/routes/searchRoutes.js';
 import autoRefreshToken from './middleware/autoRefresh.js';
 
-// Modelle
+// Models
 import User from './model/User.js';
 import SpotifyData from './model/SpotifyData.js';
 import ChatMessage from './model/ChatMessage.js';
@@ -173,7 +173,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/events', eventRsvpRoutes);
 app.use('/api/search', searchRoutes);
 
-// === Matches: Kandidaten für Discover ===
+// === Matches: Candidates for Discover ===
 app.get('/api/matches/candidates', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
@@ -376,7 +376,7 @@ app.post('/api/matches/:otherUserId/like', async (req, res, next) => {
   }
 });
 
-// === Chat: Liste meiner Matches / Chat-Räume ===
+// === Chat: My matches / chat rooms ===
 app.get('/api/chat/rooms', async (req, res, next) => {
   try {
     const me = await getCurrentUser(req);
@@ -425,13 +425,13 @@ app.use(errorHandler);
 
 const PORT = Number(process.env.PORT) || 5000;
 
-// ---- WebSocket Raumverwaltung ----
+// ---- WebSocket room management ----
 const rooms = new Map(); // roomId -> { chat: Set<WebSocket>, spotify: Set<WebSocket> }
-const onlineUsers = new Map(); // userId -> Anzahl Verbindungen
-const lastSeenAt = new Map(); // userId -> ISO timestamp (letztes offline)
+const onlineUsers = new Map(); // userId -> connection count
+const lastSeenAt = new Map(); // userId -> ISO timestamp of last offline time
 const roomSongStates = new Map(); // roomId -> current song state
 const roomSongReadyUsers = new Map(); // roomId -> Set<userId>
-const BOTH_ONLINE_REQUIRED_MESSAGE = 'Beide muessen online sein, um gemeinsam zu hoeren.';
+const BOTH_ONLINE_REQUIRED_MESSAGE = 'Both people need to be online to listen together.';
 
 function getRoomEntry(roomId) {
   let entry = rooms.get(roomId);
@@ -920,7 +920,7 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
 
                 broadcastToRoom(roomId, {
                   type: 'chat_message',
-                  message: saved.toJSON(),
+                  message: { ...saved.toJSON(), plaintext: null },
                 });
               }
             } catch (err) {
@@ -1042,11 +1042,11 @@ function broadcastPresenceUpdate(userId, isOnline, wss, extra = {}) {
           // eslint-disable-next-line no-param-reassign
           ws.userId = user.id;
 
-          // online count erhöhen
+          // Increment online count.
           const currentCount = onlineUsers.get(user.id) || 0;
           onlineUsers.set(user.id, currentCount + 1);
 
-          // ✅ Snapshot enthält online users + lastSeen map
+          // Snapshot includes online users and the lastSeen map.
           // lastSeen: { [userId]: iso }
           const lastSeenObj = {};
           for (const [uid, iso] of lastSeenAt.entries()) {

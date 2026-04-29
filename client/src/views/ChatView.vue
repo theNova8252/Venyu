@@ -1,5 +1,11 @@
 <template>
   <q-page class="chat-page column">
+    <div class="bg-mesh">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="bg-noise"></div>
+    </div>
+
     <div class="chat-header q-pa-md">
       <div class="chat-header__top row no-wrap">
         <q-btn
@@ -11,10 +17,16 @@
           @click="$router.back()"
         />
 
-        <q-avatar size="48px" class="chat-header__avatar q-ml-sm">
-          <img v-if="otherAvatar" :src="otherAvatar" :alt="otherDisplayName" />
-          <span v-else>{{ otherInitials }}</span>
-        </q-avatar>
+        <div class="chat-header__avatar-wrap q-ml-sm">
+          <q-avatar size="48px" class="chat-header__avatar">
+            <img v-if="otherAvatar" :src="otherAvatar" :alt="otherDisplayName" />
+            <span v-else class="chat-header__initials">{{ otherInitials }}</span>
+          </q-avatar>
+          <div
+            class="chat-header__presence-dot"
+            :class="otherIsOnline ? 'online' : 'offline'"
+          ></div>
+        </div>
 
         <div class="chat-header__meta q-ml-md">
           <div class="chat-header__title-row">
@@ -25,7 +37,7 @@
               dense
               no-caps
               icon="music_note"
-              label="Gemeinsam hören"
+              label="Listen together"
               class="chat-header__music-btn"
               @click.stop="onToggleMusicMenu"
             />
@@ -36,7 +48,7 @@
                 <div class="music-dialog__head">
                   <div>
                     <div class="music-dialog__eyebrow">Spotify Sync</div>
-                    <div class="music-dialog__title">Gemeinsam Song hoeren</div>
+                    <div class="music-dialog__title">Listen to a song together</div>
                   </div>
                   <q-btn
                     flat
@@ -49,7 +61,7 @@
                 </div>
 
                 <div v-if="!otherIsOnline" class="music-dialog__notice">
-                  Beide muessen online sein, um gemeinsam zu hoeren.
+                  Both people need to be online to listen together.
                 </div>
 
                 <q-input
@@ -58,7 +70,7 @@
                   dense
                   outlined
                   clearable
-                  placeholder="Song auf Spotify suchen"
+                  placeholder="Search Spotify for a song"
                   class="music-dialog__search"
                 >
                   <template #prepend>
@@ -67,12 +79,12 @@
                 </q-input>
 
                 <div v-if="trackSearchQuery.trim().length < 2" class="music-dialog__empty">
-                  Gib mindestens 2 Zeichen ein, um Songs zu suchen.
+                  Enter at least 2 characters to search for songs.
                 </div>
 
                 <div v-else-if="trackSearchLoading" class="music-dialog__loading">
                   <q-spinner color="positive" size="24px" />
-                  <span>Suche laeuft ...</span>
+                  <span>Searching ...</span>
                 </div>
 
                 <div v-else-if="trackSearchResults.length" class="music-dialog__results">
@@ -103,7 +115,7 @@
                       no-caps
                       color="positive"
                       :disable="!otherIsOnline || !isSocketOpen"
-                      label="Auswaehlen"
+                      label="Select"
                       class="music-dialog__select-btn"
                       @click="selectTrack(track)"
                     />
@@ -111,7 +123,7 @@
                 </div>
 
                 <div v-else class="music-dialog__empty">
-                  Keine Songs gefunden.
+                  No songs found.
                 </div>
             </div>
             </div>
@@ -120,7 +132,7 @@
           <div class="chat-header__presence" :class="{ 'is-online': otherIsOnline }">
             {{ otherIsOnline ? "Online" : "Offline" }}
           </div>
-          <div v-if="otherTyping" class="chat-header__typing">Tippt ...</div>
+          <div v-if="otherTyping" class="chat-header__typing">Typing ...</div>
 
           <div v-if="songState?.trackUri" class="chat-player">
             <div class="chat-player__main">
@@ -139,7 +151,7 @@
               <div class="chat-player__body">
                 <div class="chat-player__topline">
                   <div class="chat-player__title">
-                    {{ songState.trackName || "Unbekannter Song" }}
+                    {{ songState.trackName || "Unknown song" }}
                   </div>
                   <span class="chat-player__status">{{ songStatusLabel }}</span>
                 </div>
@@ -192,8 +204,8 @@
 
     <div ref="messagesContainer" class="chat-messages col scroll q-pa-md">
       <div v-if="hasUnreadableMessages" class="chat-system-note">
-        Aeltere Nachrichten aus diesem Chat koennen in einem neuen oder Inkognito-Browser
-        nicht entschluesselt werden. Neue Nachrichten werden wieder lesbar angezeigt.
+        Older messages from this chat cannot be decrypted in a new or incognito browser.
+        New messages will appear normally.
       </div>
 
       <div
@@ -224,7 +236,7 @@
         rounded
         outlined
         dense
-        placeholder="Nachricht schreiben ..."
+        placeholder="Write a message ..."
         :disable="sending"
         @keydown.enter.prevent="onSend"
         @update:model-value="onTyping"
@@ -246,7 +258,7 @@
         <div class="music-dialog__head">
           <div>
             <div class="music-dialog__eyebrow">Spotify Sync</div>
-            <div class="music-dialog__title">Gemeinsam Song hören</div>
+            <div class="music-dialog__title">Listen to a song together</div>
           </div>
           <q-btn flat round dense icon="close" class="music-dialog__close" v-close-popup />
         </div>
@@ -256,7 +268,7 @@
           dense
           outlined
           clearable
-          placeholder="Song auf Spotify suchen"
+          placeholder="Search Spotify for a song"
           class="music-dialog__search"
         >
           <template #prepend>
@@ -265,12 +277,12 @@
         </q-input>
 
         <div v-if="trackSearchQuery.trim().length < 2" class="music-dialog__empty">
-          Gib mindestens 2 Zeichen ein, um Songs zu suchen.
+          Enter at least 2 characters to search for songs.
         </div>
 
         <div v-else-if="trackSearchLoading" class="music-dialog__loading">
           <q-spinner color="positive" size="24px" />
-          <span>Suche läuft ...</span>
+          <span>Searching ...</span>
         </div>
 
         <div v-else-if="trackSearchResults.length" class="music-dialog__results">
@@ -300,7 +312,7 @@
               unelevated
               no-caps
               color="positive"
-              label="Auswählen"
+              label="Select"
               class="music-dialog__select-btn"
               @click="selectTrack(track)"
             />
@@ -308,7 +320,7 @@
         </div>
 
         <div v-else class="music-dialog__empty">
-          Keine Songs gefunden.
+          No songs found.
         </div>
       </q-card>
     </q-dialog>
@@ -334,12 +346,11 @@ import {
   importRemotePublicJwk,
 } from "@/api/e2ee";
 
-const PLAYBACK_REQUIRED_MESSAGE = "Spotify Premium oder ein aktives Spotify-Gerät wird benötigt.";
+const PLAYBACK_REQUIRED_MESSAGE = "Spotify Premium or an active Spotify device is required.";
 
-const BOTH_ONLINE_MESSAGE = "Beide muessen online sein, um gemeinsam zu hoeren.";
-const LEGACY_MESSAGE_FALLBACK = "Diese Nachricht ist nur auf dem urspruenglichen Browser lesbar.";
-const SHARED_PLAYBACK_REQUIRED_MESSAGE = "Spotify Premium und der Venyu-Webplayer im Browser werden benoetigt.";
-const UNREADABLE_MESSAGE_FALLBACK = "Nachricht konnte nicht wiederhergestellt werden.";
+const BOTH_ONLINE_MESSAGE = "Both people need to be online to listen together.";
+const SHARED_PLAYBACK_REQUIRED_MESSAGE = "Spotify Premium and the Venyu web player in this browser are required.";
+const UNREADABLE_MESSAGE_FALLBACK = "Encrypted message unavailable.";
 
 const route = useRoute();
 const $q = useQuasar();
@@ -403,6 +414,7 @@ const playerNowMs = ref(Date.now());
 const messagesContainer = ref(null);
 const musicMenuRef = ref(null);
 const socketConnected = ref(false);
+const e2eeReady = ref(false);
 const spotifyPlayerDeviceId = ref("");
 const spotifyPlayerReady = ref(false);
 
@@ -411,13 +423,12 @@ const hasUnreadableMessages = computed(() =>
   messages.value.some((message) =>
     message?._decrypted === false
     && Boolean(message?.ciphertext)
-    && !String(message?.plaintext || "").trim()
   )
 );
 const songArtistsLabel = computed(() =>
   Array.isArray(songState.value?.artists) && songState.value.artists.length
     ? songState.value.artists.join(", ")
-    : "Unbekannter Artist"
+    : "Unknown artist"
 );
 
 const countdownSeconds = computed(() => {
@@ -437,10 +448,10 @@ const songProgressRatio = computed(() => {
 
 const songStatusLabel = computed(() => {
   if (!songState.value?.trackUri) return "";
-  if (countdownSeconds.value > 0) return `Startet in ${countdownSeconds.value} ...`;
-  if (songState.value.isPlaying) return "Synchronisiert";
-  if (readyUserIds.value.length < participantIds.value.length) return "Wartet auf andere Person";
-  return "Bereit";
+  if (countdownSeconds.value > 0) return `Starting in ${countdownSeconds.value} ...`;
+  if (songState.value.isPlaying) return "Synced";
+  if (readyUserIds.value.length < participantIds.value.length) return "Waiting for the other person";
+  return "Ready";
 });
 
 let socket = null;
@@ -456,8 +467,6 @@ let spotifyPlayer = null;
 let spotifySdkPromise = null;
 let spotifyPlayerInitPromise = null;
 let spotifyPlayerActivated = false;
-let plaintextSyncTimer = null;
-const pendingPlaintextUpdates = new Map();
 
 function getServerAdjustedNow() {
   return Date.now() + serverClockOffsetMs.value;
@@ -542,7 +551,7 @@ function ensureBothOnlineForMusic({ closeMenu = true } = {}) {
 
 function ensureMusicSocketReady() {
   if (isSocketOpen.value) return true;
-  notifyError("Die Chat-Verbindung wird gerade aufgebaut. Bitte versuche es gleich noch einmal.");
+  notifyError("The chat connection is still being established. Please try again in a moment.");
   return false;
 }
 
@@ -687,41 +696,6 @@ async function ensureSpotifyWebPlayerReady() {
   })();
 
   return spotifyPlayerInitPromise;
-}
-
-async function flushPendingPlaintextSync() {
-  if (!pendingPlaintextUpdates.size) return;
-
-  const updates = Array.from(pendingPlaintextUpdates.values()).slice(0, 50);
-  updates.forEach((item) => pendingPlaintextUpdates.delete(item.id));
-
-  try {
-    await api.syncChatMessagePlaintexts(roomId.value, updates);
-  } catch {
-    updates.forEach((item) => pendingPlaintextUpdates.set(item.id, item));
-  } finally {
-    if (pendingPlaintextUpdates.size) {
-      window.clearTimeout(plaintextSyncTimer);
-      plaintextSyncTimer = window.setTimeout(() => {
-        void flushPendingPlaintextSync();
-      }, 250);
-    }
-  }
-}
-
-function queuePlaintextSync(message) {
-  const messageId = typeof message?.id === "string" ? message.id : "";
-  const plaintext = typeof message?.text === "string" ? message.text.trim() : "";
-
-  if (!messageId || !plaintext) return;
-  if (typeof message.plaintext === "string" && message.plaintext.trim()) return;
-
-  message.plaintext = plaintext;
-  pendingPlaintextUpdates.set(messageId, { id: messageId, plaintext });
-  window.clearTimeout(plaintextSyncTimer);
-  plaintextSyncTimer = window.setTimeout(() => {
-    void flushPendingPlaintextSync();
-  }, 120);
 }
 
 function onToggleMusicMenu() {
@@ -909,12 +883,6 @@ async function applySongPayload(data) {
 
 function applyMessageTextFallback(message, fallback = UNREADABLE_MESSAGE_FALLBACK) {
   if (!message) return;
-  if (typeof message.plaintext === "string" && message.plaintext.trim()) {
-    message.text = message.plaintext;
-    message._decrypted = true;
-    return;
-  }
-
   if (typeof message.text === "string" && message.text.trim()) {
     message._decrypted = true;
     return;
@@ -933,24 +901,23 @@ async function decryptAllLoadedMessages() {
       message.readByOther = !!message.readAt;
     }
 
-    if (typeof message.plaintext === "string" && message.plaintext.trim()) {
-      message.text = message.plaintext;
-      message._decrypted = true;
-      continue;
-    }
-
     if (message.ciphertext && message.iv && aesKey) {
       if (message._decrypted === true) continue;
 
       try {
         message.text = await decryptText(aesKey, message.ciphertext, message.iv);
         message._decrypted = true;
-        queuePlaintextSync(message);
         continue;
       } catch {
         applyMessageTextFallback(message);
         continue;
       }
+    }
+
+    if (message.ciphertext && message.iv && !e2eeReady.value) {
+      message.text = "";
+      message._decrypted = null;
+      continue;
     }
 
     applyMessageTextFallback(message);
@@ -975,42 +942,32 @@ async function ensureChatMetaLoaded() {
 }
 
 async function ensureE2eeKeyReadyViaRest() {
-  if (!currentUserId.value) return;
+  if (!currentUserId.value) return false;
 
   if (!myKeyPair) myKeyPair = await getOrCreateIdentity(currentUserId.value);
 
-  const flagKey = `e2ee_pub_uploaded_v1_${currentUserId.value}`;
-  if (!localStorage.getItem(flagKey)) {
-    try {
-      const publicKeyJwk = await exportPublicJwk(myKeyPair);
-      await fetch("/api/chat/e2ee/public-key", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publicKeyJwk }),
-      });
-      localStorage.setItem(flagKey, "1");
-    } catch {
-      // ignore
-    }
+  try {
+    const publicKeyJwk = await exportPublicJwk(myKeyPair);
+    await api.upsertMyPublicKey(publicKeyJwk);
+  } catch {
+    // Keep going: the peer key may still be available, and websocket key exchange can recover.
   }
 
   try {
-    const res = await fetch(`/api/chat/rooms/${encodeURIComponent(roomId.value)}/peer-key`, {
-      credentials: "include",
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.publicKeyJwk) {
-        const theirPublicKey = await importRemotePublicJwk(data.publicKeyJwk);
-        aesKey = await deriveAesKey(myKeyPair, theirPublicKey);
-        await decryptAllLoadedMessages();
-      }
+    const data = await api.getPeerPublicKey(roomId.value);
+    if (data?.publicKeyJwk) {
+      const theirPublicKey = await importRemotePublicJwk(data.publicKeyJwk);
+      aesKey = await deriveAesKey(myKeyPair, theirPublicKey);
+      e2eeReady.value = true;
+      await decryptAllLoadedMessages();
+      return true;
     }
   } catch {
     // ignore
   }
+
+  e2eeReady.value = Boolean(aesKey);
+  return e2eeReady.value;
 }
 
 async function sendMyPublicKeyWs() {
@@ -1057,6 +1014,7 @@ function connectChatWebSocket() {
       if (data.type === "key_exchange") {
         const theirPublicKey = await importRemotePublicJwk(data.publicKeyJwk);
         aesKey = await deriveAesKey(myKeyPair, theirPublicKey);
+        e2eeReady.value = true;
         await decryptAllLoadedMessages();
         return;
       }
@@ -1079,17 +1037,16 @@ function connectChatWebSocket() {
         message.isMine = String(message.senderId) === String(currentUserId.value);
         message.readByOther = message.isMine ? !!message.readAt : false;
 
-        if (typeof message.plaintext === "string" && message.plaintext.trim()) {
-          message.text = message.plaintext;
-          message._decrypted = true;
-        } else if (aesKey && message.ciphertext && message.iv) {
+        if (aesKey && message.ciphertext && message.iv) {
           try {
             message.text = await decryptText(aesKey, message.ciphertext, message.iv);
             message._decrypted = true;
-            queuePlaintextSync(message);
           } catch {
             applyMessageTextFallback(message);
           }
+        } else if (message.ciphertext && message.iv && !e2eeReady.value) {
+          message.text = "";
+          message._decrypted = null;
         } else {
           applyMessageTextFallback(message);
         }
@@ -1150,10 +1107,6 @@ async function onSend() {
   const text = draft.value.trim();
   if (!text || !isSocketOpen.value) return;
 
-  let ciphertext = null;
-  let iv = null;
-  let version = "plaintext-v1";
-
   if (!aesKey) {
     await ensureE2eeKeyReadyViaRest();
     if (!aesKey) {
@@ -1161,21 +1114,20 @@ async function onSend() {
     }
   }
 
+  if (!aesKey) {
+    notifyError("Secure chat is still being prepared. Please try again in a moment.");
+    return;
+  }
+
   sending.value = true;
   try {
-    if (aesKey) {
-      const encrypted = await encryptText(aesKey, text);
-      ciphertext = encrypted.ciphertext;
-      iv = encrypted.iv;
-      version = "aes-gcm-v1";
-    }
+    const encrypted = await encryptText(aesKey, text);
 
     sendSocketMessage({
       type: "chat_message",
-      ciphertext,
-      iv,
-      plaintext: text,
-      version,
+      ciphertext: encrypted.ciphertext,
+      iv: encrypted.iv,
+      version: "aes-gcm-v1",
     });
     draft.value = "";
     sendSocketMessage({ type: "typing", isTyping: false });
@@ -1249,7 +1201,7 @@ async function runTrackSearch(query) {
   } catch (error) {
     if (searchToken !== latestSearchToken) return;
     trackSearchResults.value = [];
-    notifyError("Spotify-Suche konnte nicht geladen werden.");
+    notifyError("Spotify search could not be loaded.");
   } finally {
     if (searchToken === latestSearchToken) {
       trackSearchLoading.value = false;
@@ -1318,13 +1270,13 @@ watch(
     seekPreviewMs.value = null;
     lastAutoReadyKey = "";
     socketConnected.value = false;
-    pendingPlaintextUpdates.clear();
-    window.clearTimeout(plaintextSyncTimer);
+    aesKey = null;
+    e2eeReady.value = false;
     clearPlaybackTimer();
 
     await ensureChatMetaLoaded();
-    await fetchMessages();
     await ensureE2eeKeyReadyViaRest();
+    await fetchMessages();
     connectChatWebSocket();
   }
 );
@@ -1339,8 +1291,8 @@ onMounted(async () => {
   }, 250);
 
   await ensureChatMetaLoaded();
-  await fetchMessages();
   await ensureE2eeKeyReadyViaRest();
+  await fetchMessages();
   connectChatWebSocket();
 });
 
@@ -1349,8 +1301,6 @@ onUnmounted(() => {
   socketConnected.value = false;
   document.removeEventListener("pointerdown", handleDocumentPointerDown);
   if (socket) socket.close();
-  pendingPlaintextUpdates.clear();
-  window.clearTimeout(plaintextSyncTimer);
   if (spotifyPlayer) {
     try {
       spotifyPlayer.disconnect();
@@ -1370,52 +1320,75 @@ onUnmounted(() => {
 });
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+/* ─── Foundations ─────────────────────────────────────── */
 .chat-page {
-  --chat-bg: #f4f7fb;
-  --chat-surface: rgba(255, 255, 255, 0.92);
-  --chat-surface-strong: #ffffff;
-  --chat-surface-soft: rgba(245, 248, 252, 0.92);
-  --chat-text: #162033;
-  --chat-muted: #6a7388;
-  --chat-border: rgba(18, 32, 54, 0.12);
-  --chat-shadow: 0 18px 45px rgba(17, 24, 39, 0.08);
-  --chat-self-bubble: linear-gradient(135deg, #dcfce7, #bbf7d0);
-  --chat-other-bubble: rgba(255, 255, 255, 0.94);
-  --chat-accent: #1db954;
-  --chat-accent-strong: #15803d;
-  --chat-input-bg: rgba(255, 255, 255, 0.98);
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top right, rgba(29, 185, 84, 0.12), transparent 35%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef3f8 100%);
-  color: var(--chat-text);
+  background: #0a0a0f;
+  color: #e4e4e7;
+  position: relative;
+  overflow-x: hidden;
 }
 
-:global(body.body--dark) .chat-page {
-  --chat-bg: #0c1018;
-  --chat-surface: rgba(16, 22, 34, 0.94);
-  --chat-surface-strong: rgba(20, 27, 40, 0.98);
-  --chat-surface-soft: rgba(18, 24, 37, 0.96);
-  --chat-text: #eef2ff;
-  --chat-muted: #98a2b8;
-  --chat-border: rgba(148, 163, 184, 0.18);
-  --chat-shadow: 0 24px 55px rgba(0, 0, 0, 0.32);
-  --chat-self-bubble: linear-gradient(135deg, rgba(29, 185, 84, 0.34), rgba(34, 197, 94, 0.2));
-  --chat-other-bubble: rgba(18, 24, 37, 0.94);
-  --chat-accent: #34d399;
-  --chat-accent-strong: #10b981;
-  --chat-input-bg: rgba(17, 24, 39, 0.96);
-  background:
-    radial-gradient(circle at top right, rgba(52, 211, 153, 0.16), transparent 35%),
-    linear-gradient(180deg, #0c1018 0%, #121826 100%);
+/* ─── Background mesh ─────────────────────────────────── */
+.bg-mesh {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
 }
 
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(120px);
+  opacity: 0.22;
+}
+
+.orb-1 {
+  width: 460px;
+  height: 460px;
+  right: -90px;
+  top: -100px;
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+}
+
+.orb-2 {
+  width: 380px;
+  height: 380px;
+  left: -70px;
+  bottom: -80px;
+  background: linear-gradient(135deg, #ec4899, #f43f5e);
+}
+
+.bg-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+/* ─── Liquid glass ────────────────────────────────────── */
+%liquid-glass {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Header ──────────────────────────────────────────── */
 .chat-header {
-  background: var(--chat-surface);
-  border-bottom: 1px solid var(--chat-border);
-  box-shadow: var(--chat-shadow);
-  backdrop-filter: blur(16px);
+  position: relative;
+  z-index: 2;
+  background: rgba(10, 10, 15, 0.55);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
 }
 
 .chat-header__top {
@@ -1424,22 +1397,64 @@ onUnmounted(() => {
 }
 
 .chat-header__nav-btn {
-  color: var(--chat-text);
-  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.chat-header__nav-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-header__avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
 .chat-header__avatar {
-  background: linear-gradient(135deg, rgba(29, 185, 84, 0.18), rgba(59, 130, 246, 0.18));
-  color: var(--chat-text);
-  border: 1px solid var(--chat-border);
+  border: 2px solid rgba(139, 92, 246, 0.28);
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.18);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.18), rgba(236, 72, 153, 0.18));
+}
+
+.chat-header__initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+}
+
+.chat-header__presence-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #0a0a0f;
+
+  &.online {
+    background: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.55);
+  }
+
+  &.offline {
+    background: rgba(255, 255, 255, 0.22);
+  }
 }
 
 .chat-header__meta {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(190px, 240px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px) auto;
   grid-template-rows: auto auto auto;
-  gap: 0.08rem 0.55rem;
+  gap: 0.08rem 0.6rem;
   align-items: center;
   min-width: 0;
   flex: 1 1 auto;
@@ -1450,27 +1465,18 @@ onUnmounted(() => {
   display: contents;
 }
 
-.chat-header__identity {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
 .chat-header__name {
   grid-column: 1;
   grid-row: 1;
   margin-top: 0.18rem;
-  color: var(--chat-text);
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   line-height: 1.2;
-}
-
-.chat-header__presence-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.15rem;
+  background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.78) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .chat-header__music-menu {
@@ -1483,29 +1489,34 @@ onUnmounted(() => {
 }
 
 .chat-header__music-btn {
-  background: rgba(29, 185, 84, 0.14);
-  color: var(--chat-accent-strong);
-  border: 1px solid rgba(29, 185, 84, 0.28);
+  background: rgba(30, 215, 96, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(30, 215, 96, 0.28);
   border-radius: 999px;
-  min-height: 34px;
-  width: auto;
-  height: 34px;
-  padding: 0 0.55rem;
-  box-shadow: 0 8px 16px rgba(29, 185, 84, 0.14);
+  min-height: 36px;
+  height: 36px;
+  padding: 0 0.85rem;
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 22px rgba(30, 215, 96, 0.16);
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.chat-header__music-btn:hover {
+  background: rgba(30, 215, 96, 0.18);
+  transform: translateY(-1px);
 }
 
 .chat-header__music-btn :deep(.q-btn__content) {
   gap: 0.35rem;
 }
 
-.chat-header__music-btn :deep(.q-btn__content .block) {
-  display: inline;
-}
-
 .chat-header__presence,
 .chat-header__typing {
-  color: var(--chat-muted);
-  font-size: 0.83rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .chat-header__presence {
@@ -1516,53 +1527,51 @@ onUnmounted(() => {
 .chat-header__typing {
   grid-column: 1;
   grid-row: 3;
+  color: rgba(167, 139, 250, 0.85);
+  font-style: italic;
 }
 
 .chat-header__presence.is-online {
-  color: var(--chat-accent);
+  color: #22c55e;
 }
 
+/* ─── Inline player ───────────────────────────────────── */
 .chat-player {
   grid-column: 2;
   grid-row: 1 / span 3;
   justify-self: center;
   align-self: center;
-  background: var(--chat-surface-strong);
-  border: 1px solid var(--chat-border);
-  border-radius: 13px;
-  padding: 0.28rem 0.42rem;
-  margin-top: 0;
-  width: min(100%, 232px);
-  max-width: 232px;
+  @extend %liquid-glass;
+  border-radius: 14px;
+  padding: 0.4rem 0.55rem;
+  width: min(100%, 250px);
+  max-width: 250px;
+  border-color: rgba(30, 215, 96, 0.18);
+  background:
+    linear-gradient(135deg, rgba(30, 215, 96, 0.06), rgba(255, 255, 255, 0.03));
 }
 
 .chat-player__main {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.35rem;
+  gap: 0.45rem;
   align-items: center;
-}
-
-.chat-player__cover-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .chat-player__cover {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   object-fit: cover;
   border-radius: 9px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
 }
 
 .chat-player__cover--placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(29, 185, 84, 0.16);
-  color: var(--chat-accent-strong);
+  background: rgba(30, 215, 96, 0.16);
+  color: #4ade80;
 }
 
 .chat-player__body {
@@ -1573,20 +1582,20 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.45rem;
+  gap: 0.4rem;
 }
 
 .chat-player__title {
-  color: var(--chat-text);
+  color: #fff;
   font-weight: 700;
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .chat-player__artists {
-  color: var(--chat-muted);
+  color: rgba(255, 255, 255, 0.45);
   font-size: 0.65rem;
   white-space: nowrap;
   overflow: hidden;
@@ -1594,42 +1603,31 @@ onUnmounted(() => {
 }
 
 .chat-player__status {
-  color: var(--chat-accent-strong);
-  font-weight: 600;
-  font-size: 0.6rem;
+  color: #4ade80;
+  font-weight: 700;
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
-.chat-player__bottomline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-  margin-top: 0.08rem;
-}
-
 .chat-player__time {
-  color: var(--chat-muted);
-  font-size: 0.58rem;
-  margin-top: 0;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.6rem;
 }
 
 .chat-player__slider {
-  margin-top: -0.48rem;
-  margin-bottom: -0.82rem;
-  color: var(--chat-text);
-}
-
-.chat-player__actions {
-  display: flex;
-  align-items: center;
+  margin-top: -0.4rem;
+  margin-bottom: -0.7rem;
+  color: #fff;
 }
 
 .chat-player__action-btn {
-  background: var(--chat-accent);
-  color: #062b13;
-  width: 26px;
-  height: 26px;
+  background: linear-gradient(135deg, #1ed760, #16a34a);
+  color: #052e16;
+  width: 28px;
+  height: 28px;
+  box-shadow: 0 6px 18px rgba(30, 215, 96, 0.32);
 }
 
 .chat-player__warning {
@@ -1637,21 +1635,25 @@ onUnmounted(() => {
 }
 
 .chat-separator {
-  background: var(--chat-border);
+  display: none;
 }
 
+/* ─── Messages area ───────────────────────────────────── */
 .chat-messages {
+  position: relative;
+  z-index: 1;
   background: transparent;
 }
 
 .chat-system-note {
   margin-bottom: 0.8rem;
-  padding: 0.75rem 0.9rem;
+  padding: 0.75rem 0.95rem;
   border-radius: 14px;
-  border: 1px solid rgba(245, 158, 11, 0.28);
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--chat-text);
-  font-size: 0.82rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: rgba(251, 191, 36, 0.06);
+  color: rgba(254, 215, 170, 0.92);
+  font-size: 0.78rem;
+  backdrop-filter: blur(10px);
 }
 
 .chat-message {
@@ -1667,75 +1669,135 @@ onUnmounted(() => {
 }
 
 .bubble {
+  position: relative;
   max-width: min(75%, 520px);
-  padding: 0.8rem 0.95rem;
+  padding: 0.7rem 0.95rem;
   border-radius: 18px;
-  border: 1px solid var(--chat-border);
-  background: var(--chat-other-bubble);
-  color: var(--chat-text);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.other-message .bubble {
+  border-bottom-left-radius: 6px;
 }
 
 .self-message .bubble {
-  background: var(--chat-self-bubble);
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 50%, #ec4899 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom-right-radius: 6px;
+  box-shadow:
+    0 10px 28px rgba(139, 92, 246, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.chat-message__meta,
-.chat-message__loading {
-  color: var(--chat-muted);
-  font-size: 0.78rem;
+.bubble .text-body2 {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-message__meta {
+  margin-top: 0.35rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.self-message .chat-message__meta {
+  color: rgba(255, 255, 255, 0.78);
+  text-align: right;
 }
 
 .chat-message__loading {
   text-align: center;
   padding: 0.8rem 0;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.4);
 }
 
+/* ─── Input ───────────────────────────────────────────── */
 .chat-input {
-  background: var(--chat-surface);
-  border-top: 1px solid var(--chat-border);
-  backdrop-filter: blur(14px);
-}
-
-.chat-input__field {
-  color: var(--chat-text);
+  position: relative;
+  z-index: 2;
+  background: rgba(10, 10, 15, 0.6);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
 }
 
 .chat-input__field :deep(.q-field__control) {
-  background: var(--chat-input-bg);
+  background: rgba(255, 255, 255, 0.04);
   border-radius: 999px;
-  color: var(--chat-text);
+  color: #fff;
   box-shadow: none;
+  min-height: 44px;
+  padding: 0 18px;
+}
+
+.chat-input__field :deep(.q-field__control::before) {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 999px !important;
+}
+
+.chat-input__field :deep(.q-field__control:hover::before),
+.chat-input__field :deep(.q-field--focused .q-field__control::before) {
+  border-color: rgba(139, 92, 246, 0.45) !important;
 }
 
 .chat-input__field :deep(.q-field__native),
 .chat-input__field :deep(.q-field__input) {
-  color: var(--chat-text);
+  color: #fff;
+  font-size: 0.9rem;
 }
 
 .chat-input__field :deep(.q-field__native::placeholder),
 .chat-input__field :deep(.q-field__input::placeholder) {
-  color: var(--chat-muted);
+  color: rgba(255, 255, 255, 0.35);
   opacity: 1;
 }
 
-.chat-input__field :deep(.q-field__outline) {
-  color: var(--chat-border);
-}
-
 .chat-input__send-btn {
-  background: var(--chat-accent);
-  color: #062b13;
-  box-shadow: 0 14px 24px rgba(29, 185, 84, 0.24);
+  background: linear-gradient(135deg, #8b5cf6, #a855f7 50%, #ec4899);
+  color: #fff;
+  width: 44px;
+  height: 44px;
+  box-shadow: 0 8px 22px rgba(139, 92, 246, 0.38);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
+.chat-input__send-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(139, 92, 246, 0.5);
+}
+
+.chat-input__send-btn:disabled {
+  opacity: 0.45;
+}
+
+/* ─── Music dialog ────────────────────────────────────── */
 .music-dialog {
   width: min(420px, calc(100vw - 24px));
   border-radius: 20px;
-  background: var(--chat-surface-strong);
-  color: var(--chat-text);
-  border: 1px solid var(--chat-border);
-  box-shadow: var(--chat-shadow);
+  background: rgba(15, 15, 22, 0.92);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
 }
 
 .music-dialog--dropdown {
@@ -1750,62 +1812,78 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 0.75rem;
   align-items: flex-start;
-  padding: 0.85rem 0.9rem 0.55rem;
+  padding: 0.95rem 1rem 0.65rem;
 }
 
 .music-dialog__notice {
-  margin: 0 0.9rem 0.7rem;
-  padding: 0.7rem 0.8rem;
+  margin: 0 1rem 0.7rem;
+  padding: 0.7rem 0.85rem;
   border-radius: 14px;
-  border: 1px solid rgba(245, 158, 11, 0.28);
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--chat-text);
-  font-size: 0.8rem;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background: rgba(251, 191, 36, 0.06);
+  color: rgba(254, 215, 170, 0.92);
+  font-size: 0.78rem;
 }
 
 .music-dialog__eyebrow {
-  color: var(--chat-accent-strong);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  color: #4ade80;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .music-dialog__title {
-  color: var(--chat-text);
+  margin-top: 2px;
+  color: #fff;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .music-dialog__close {
-  color: var(--chat-text);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.music-dialog__close:hover {
+  color: #fff;
 }
 
 .music-dialog__search {
-  padding: 0 0.9rem;
+  padding: 0 1rem;
 }
 
 .music-dialog__search :deep(.q-field__control) {
-  background: var(--chat-input-bg);
-  color: var(--chat-text);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  border-radius: 12px;
+}
+
+.music-dialog__search :deep(.q-field__control::before) {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+}
+
+.music-dialog__search :deep(.q-field--focused .q-field__control::before) {
+  border-color: rgba(139, 92, 246, 0.45) !important;
 }
 
 .music-dialog__search :deep(.q-field__native),
 .music-dialog__search :deep(.q-field__input),
 .music-dialog__search :deep(.q-icon) {
-  color: var(--chat-text);
+  color: #fff;
 }
 
 .music-dialog__search :deep(.q-field__native::placeholder),
 .music-dialog__search :deep(.q-field__input::placeholder) {
-  color: var(--chat-muted);
+  color: rgba(255, 255, 255, 0.35);
   opacity: 1;
 }
 
 .music-dialog__results,
 .music-dialog__empty,
 .music-dialog__loading {
-  padding: 0.9rem;
+  padding: 0.95rem 1rem;
 }
 
 .music-dialog__loading,
@@ -1814,16 +1892,26 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  color: var(--chat-muted);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.82rem;
   min-height: 120px;
   text-align: center;
 }
 
 .music-dialog__results {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.55rem;
   max-height: 46vh;
   overflow-y: auto;
+}
+
+.music-dialog__results::-webkit-scrollbar {
+  width: 6px;
+}
+
+.music-dialog__results::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 .music-dialog__result {
@@ -1831,25 +1919,32 @@ onUnmounted(() => {
   grid-template-columns: auto 1fr auto;
   gap: 0.7rem;
   align-items: center;
-  padding: 0.7rem;
-  border-radius: 16px;
-  border: 1px solid var(--chat-border);
-  background: var(--chat-surface-soft);
+  padding: 0.65rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.music-dialog__result:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(139, 92, 246, 0.22);
 }
 
 .music-dialog__cover {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .music-dialog__cover--placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(29, 185, 84, 0.14);
-  color: var(--chat-accent-strong);
+  background: rgba(30, 215, 96, 0.14);
+  color: #4ade80;
 }
 
 .music-dialog__result-body {
@@ -1857,20 +1952,35 @@ onUnmounted(() => {
 }
 
 .music-dialog__result-title {
-  color: var(--chat-text);
+  color: #fff;
   font-weight: 700;
-  font-size: 0.92rem;
+  font-size: 0.86rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .music-dialog__result-artist {
-  color: var(--chat-muted);
-  font-size: 0.8rem;
+  margin-top: 1px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.74rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .music-dialog__select-btn {
   border-radius: 999px;
+  background: linear-gradient(135deg, #1ed760, #16a34a) !important;
+  color: #052e16 !important;
+  font-weight: 700;
+  font-size: 0.74rem;
+  padding: 0 14px;
+  min-height: 30px;
+  box-shadow: 0 6px 16px rgba(30, 215, 96, 0.3);
 }
 
+/* ─── Responsive ──────────────────────────────────────── */
 @media (max-width: 700px) {
   .chat-header__meta {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1883,7 +1993,7 @@ onUnmounted(() => {
     justify-self: stretch;
     max-width: none;
     width: 100%;
-    margin-top: 0.35rem;
+    margin-top: 0.4rem;
   }
 
   .chat-header__music-menu {
@@ -1891,12 +2001,16 @@ onUnmounted(() => {
     grid-row: 1 / span 3;
   }
 
-  .chat-player__main {
-    grid-template-columns: auto 1fr auto;
+  .chat-header__music-btn :deep(.q-btn__content .block) {
+    display: none;
+  }
+
+  .chat-header__music-btn {
+    padding: 0 0.55rem;
   }
 
   .bubble {
-    max-width: 88%;
+    max-width: 86%;
   }
 
   .music-dialog {

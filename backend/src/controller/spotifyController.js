@@ -207,8 +207,8 @@ const withSpotifyFallback = async (fn, fallbackValue, label) => {
   }
 };
 
-const PREMIUM_REQUIRED_HINT = 'Spotify Premium oder ein aktives Spotify-Gerät wird benötigt.';
-const DEVICE_REQUIRED_HINT = 'Öffne Spotify (Handy/Desktop) und starte kurz einen Song, dann nochmal.';
+const PREMIUM_REQUIRED_HINT = 'Spotify Premium or an active Spotify device is required.';
+const DEVICE_REQUIRED_HINT = 'Open Spotify on your phone or desktop, start a song briefly, then try again.';
 
 const requireAccessToken = (req) => {
   const { at } = req.cookies || {};
@@ -669,7 +669,7 @@ export const play = async (req, res) => {
       if (!finalDeviceId) {
         return res.status(409).json({
           error: 'no_device_available',
-          hint: 'Öffne Spotify (Handy/Desktop) und starte kurz einen Song, dann nochmal.',
+          hint: DEVICE_REQUIRED_HINT,
         });
       }
     }

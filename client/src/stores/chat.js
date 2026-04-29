@@ -30,12 +30,12 @@ export const useChatStore = defineStore("chat", {
 
         // Normalize
         for (const m of arr) {
-          // isMine kommt vom Backend, aber wir lassen’s notfalls clientseitig korrigieren
+          // isMine comes from the backend, but keep a client-side correction fallback.
           if (currentUserId != null) {
             m.isMine = String(m.senderId) === String(currentUserId);
           }
 
-          // readByOther: wenn ich Sender bin und readAt gesetzt ist (oder readBy existiert)
+          // readByOther: true when I am the sender and readAt is set.
           if (typeof m.readByOther !== "boolean") {
             m.readByOther =
               !!m.readAt &&
@@ -43,7 +43,7 @@ export const useChatStore = defineStore("chat", {
               String(m.senderId) === String(currentUserId);
           }
 
-          // text wird später nach Key-Handshake entschlüsselt
+          // text is decrypted later after the key handshake.
           if (typeof m.text !== "string") m.text = "";
         }
 
@@ -66,7 +66,7 @@ export const useChatStore = defineStore("chat", {
       this.byRoomId[roomId].push(message);
     },
 
-    // ✅ Mark my messages as read (up to lastReadMessageId)
+    // Mark my messages as read up to lastReadMessageId.
     markReadUpTo(roomId, lastReadMessageId, currentUserId) {
       const arr = this.byRoomId[roomId];
       if (!arr || !lastReadMessageId || !currentUserId) return;

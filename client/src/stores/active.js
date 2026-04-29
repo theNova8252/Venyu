@@ -118,7 +118,7 @@ export const usePresenceStore = defineStore("presence", {
 
           if (data.type === "presence_snapshot") {
             this.onlineUserIds = (data.users || []).map(String);
-            // optional: wenn backend später offlineSince mitschickt:
+            // Optional: if the backend sends offlineSince later:
             // data.offlineSince = { userId: iso }
             if (data.offlineSince && typeof data.offlineSince === "object") {
               for (const [uid, iso] of Object.entries(data.offlineSince)) {
@@ -146,16 +146,15 @@ export const usePresenceStore = defineStore("presence", {
               if (!this.onlineUserIds.includes(id)) {
                 this.onlineUserIds = [...this.onlineUserIds, id];
               }
-              // wenn user online wird, löschen wir offlineSince NICHT zwingend,
-              // damit wir weiterhin "seit ... offline" für später haben.
-              // (optional könntest du hier löschen)
+              // When a user comes online, keep offlineSince so "offline since ..."
+              // can still be shown later.
               return;
             }
 
             // offline event:
             this.onlineUserIds = this.onlineUserIds.filter((u) => u !== id);
 
-            // Backend kann optional lastSeenAt/offlineSince senden:
+            // The backend can optionally send lastSeenAt/offlineSince:
             const iso = toIsoMaybe(data.offlineSince || data.lastSeenAt || new Date());
             if (iso) {
               this.offlineSinceByUserId[id] = iso;
